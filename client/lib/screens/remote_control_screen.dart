@@ -49,7 +49,6 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
     deviceService.onConnectResponse = (data) {
       final status = data['status'] as String;
       if (status == 'success') {
-        _sessionId = data['session_id'] as String?;
         if (mounted) {
           setState(() {
             _isControlling = true;
