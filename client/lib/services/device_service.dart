@@ -13,6 +13,7 @@ class DeviceService extends ChangeNotifier {
   List<Device> get devices => _devices;
   bool get connected => _connected;
   String? get currentDeviceId => _currentDeviceId;
+  WebSocketChannel? get channel => _channel;
 
   // 服务器地址（可以从配置读取）
   String _serverUrl = 'ws://localhost:8080/ws';
@@ -102,6 +103,10 @@ class DeviceService extends ChangeNotifier {
   Function(Map<String, dynamic>)? onScreenFrameReceived;
   // 连接响应回调
   Function(Map<String, dynamic>)? onConnectResponse;
+  // 通知接收回调
+  Function(Map<String, dynamic>)? onNotificationReceived;
+  // 输入控制接收回调（被控端）
+  Function(Map<String, dynamic>)? onInputControlReceived;
 
   void _handleMessage(dynamic message) {
     try {
@@ -122,6 +127,12 @@ class DeviceService extends ChangeNotifier {
           break;
         case 'screen_frame':
           onScreenFrameReceived?.call(data['data'] as Map<String, dynamic>);
+          break;
+        case 'notification':
+          onNotificationReceived?.call(data['data'] as Map<String, dynamic>);
+          break;
+        case 'input_mouse', 'input_keyboard':
+          onInputControlReceived?.call(data);
           break;
         default:
           print('未知消息类型: $type');
