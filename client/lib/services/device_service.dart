@@ -165,6 +165,9 @@ class DeviceService extends ChangeNotifier {
         case 'terminal_command':
           onTerminalCommandReceived?.call(data['data'] as Map<String, dynamic>);
           break;
+        case 'file_upload_response':
+          onFileUploadResponseReceived?.call(data['data'] as Map<String, dynamic>);
+          break;
         default:
           print('未知消息类型: $type');
       }
