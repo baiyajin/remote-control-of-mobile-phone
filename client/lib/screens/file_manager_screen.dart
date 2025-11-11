@@ -182,15 +182,21 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
         }
         
         // 上传文件
-        await _fileService.uploadFile(_currentPath, fileName, fileData);
+        final success = await _fileService.uploadFile(_currentPath, fileName, fileData);
         
         if (mounted) {
           Navigator.pop(context); // 关闭进度对话框
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('文件上传成功')),
-          );
-          // 刷新文件列表
-          _loadFiles(_currentPath);
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('文件上传成功')),
+            );
+            // 刷新文件列表
+            _loadFiles(_currentPath);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('文件上传失败')),
+            );
+          }
         }
       } catch (e) {
         if (mounted) {

@@ -49,8 +49,21 @@ class FileService {
     );
   }
 
-  // 上传文件
-  Future<void> uploadFile(String targetPath, String fileName, List<int> fileData) async {
+  // 上传文件（带响应等待）
+  Future<bool> uploadFile(String targetPath, String fileName, List<int> fileData) async {
+    final completer = Completer<bool>();
+    final requestId = DateTime.now().millisecondsSinceEpoch.toString();
+    
+    // 设置响应回调
+    _deviceService.onFileUploadResponseReceived = (data) {
+      final responsePath = data['path'] as String?;
+      if (responsePath != null && responsePath.contains(fileName)) {
+        final success = data['success'] as bool? ?? false;
+        completer.complete(success);
+        _deviceService.onFileUploadResponseReceived = null; // 清除回调
+      }
+    };
+    
     final message = {
       'type': 'file_upload',
       'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
@@ -62,6 +75,15 @@ class FileService {
     };
 
     _deviceService.channel?.sink.add(jsonEncode(message));
+    
+    // 等待响应（超时30秒）
+    return completer.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        _deviceService.onFileUploadResponseReceived = null;
+        return false;
+      },
+    );
   }
 
   // 下载文件（带响应等待）
