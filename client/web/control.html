@@ -175,6 +175,83 @@
         .hidden {
             display: none;
         }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .close {
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .file-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .file-item {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-item:hover {
+            background: #f5f5f5;
+        }
+
+        .terminal-output {
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            padding: 10px;
+            height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .terminal-input {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .terminal-input input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -311,10 +388,30 @@
                     displayScreenFrame(message.data);
                     break;
                 case 'terminal_output':
-                    // 终端输出处理
+                    handleTerminalOutput(message.data);
                     break;
                 case 'file_list':
-                    // 文件列表处理
+                    handleFileList(message.data);
+                    break;
+                case 'file_download':
+                    // 处理文件下载
+                    if (message.data.file_data) {
+                        const blob = base64ToBlob(message.data.file_data, 'application/octet-stream');
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = message.data.path.split('/').pop() || 'download';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    }
+                    break;
+                case 'file_upload_response':
+                    if (message.data.success) {
+                        alert('文件上传成功');
+                        loadFileList(currentFilePath);
+                    } else {
+                        alert('文件上传失败');
+                    }
                     break;
             }
         }
@@ -453,12 +550,145 @@
             }
         }
 
+        let fileListData = [];
+        let currentFilePath = 'C:\\';
+        let terminalOutput = [];
+
         function showFileManager() {
-            alert('文件管理功能待实现');
+            const modal = document.getElementById('fileManagerModal');
+            modal.style.display = 'block';
+            loadFileList(currentFilePath);
+        }
+
+        function closeFileManager() {
+            document.getElementById('fileManagerModal').style.display = 'none';
+        }
+
+        function loadFileList(path) {
+            currentFilePath = path;
+            document.getElementById('filePathInput').value = path;
+
+            const message = {
+                type: 'file_list',
+                timestamp: Math.floor(Date.now() / 1000),
+                session_id: sessionId,
+                data: {
+                    path: path
+                }
+            };
+            ws.send(JSON.stringify(message));
+        }
+
+        function handleFileList(data) {
+            fileListData = data.files || [];
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+
+            fileListData.forEach(file => {
+                const item = document.createElement('li');
+                item.className = 'file-item';
+                item.innerHTML = `
+                    <span>${file.type === 'directory' ? '📁' : '📄'} ${file.name}</span>
+                    <span>${file.type === 'directory' ? '目录' : (file.size / 1024).toFixed(2) + ' KB'}</span>
+                `;
+                item.onclick = () => {
+                    if (file.type === 'directory') {
+                        loadFileList(file.path);
+                    } else {
+                        downloadFile(file.path);
+                    }
+                };
+                fileList.appendChild(item);
+            });
+        }
+
+        function downloadFile(filePath) {
+            const message = {
+                type: 'file_download',
+                timestamp: Math.floor(Date.now() / 1000),
+                session_id: sessionId,
+                data: {
+                    path: filePath
+                }
+            };
+            ws.send(JSON.stringify(message));
+        }
+
+        function uploadFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const fileData = Array.from(new Uint8Array(event.target.result));
+                        const base64Data = btoa(String.fromCharCode.apply(null, fileData));
+                        
+                        const message = {
+                            type: 'file_upload',
+                            timestamp: Math.floor(Date.now() / 1000),
+                            session_id: sessionId,
+                            data: {
+                                path: currentFilePath,
+                                file_name: file.name,
+                                file_data: base64Data
+                            }
+                        };
+                        ws.send(JSON.stringify(message));
+                        alert('文件上传中...');
+                    };
+                    reader.readAsArrayBuffer(file);
+                }
+            };
+            input.click();
         }
 
         function showTerminal() {
-            alert('终端功能待实现');
+            const modal = document.getElementById('terminalModal');
+            modal.style.display = 'block';
+            terminalOutput = [];
+            updateTerminalDisplay();
+        }
+
+        function closeTerminal() {
+            document.getElementById('terminalModal').style.display = 'none';
+        }
+
+        function sendTerminalCommand() {
+            const input = document.getElementById('terminalInput');
+            const command = input.value.trim();
+            if (!command || !sessionId) return;
+
+            terminalOutput.push(`$ ${command}`);
+            updateTerminalDisplay();
+
+            const message = {
+                type: 'terminal_command',
+                timestamp: Math.floor(Date.now() / 1000),
+                session_id: sessionId,
+                data: {
+                    command: command
+                }
+            };
+            ws.send(JSON.stringify(message));
+            input.value = '';
+        }
+
+        function handleTerminalOutput(data) {
+            if (data.stdout) {
+                terminalOutput.push(data.stdout);
+            }
+            if (data.stderr) {
+                terminalOutput.push(`[ERROR] ${data.stderr}`);
+            }
+            updateTerminalDisplay();
+        }
+
+        function updateTerminalDisplay() {
+            const output = document.getElementById('terminalOutput');
+            output.textContent = terminalOutput.join('\n');
+            output.scrollTop = output.scrollHeight;
         }
 
         function disconnectControl() {
@@ -468,7 +698,64 @@
             document.getElementById('deviceList').classList.remove('hidden');
             requestDeviceList();
         }
+
+        function base64ToBlob(base64, mimeType) {
+            const byteCharacters = atob(base64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], {type: mimeType});
+        }
+
+        // 关闭模态框
+        window.onclick = function(event) {
+            const fileModal = document.getElementById('fileManagerModal');
+            const terminalModal = document.getElementById('terminalModal');
+            if (event.target == fileModal) {
+                fileModal.style.display = 'none';
+            }
+            if (event.target == terminalModal) {
+                terminalModal.style.display = 'none';
+            }
+        }
     </script>
+
+    <!-- 文件管理模态框 -->
+    <div id="fileManagerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>文件管理</h2>
+                <span class="close" onclick="closeFileManager()">&times;</span>
+            </div>
+            <div>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <input type="text" id="filePathInput" style="flex: 1; padding: 8px;" placeholder="路径" onkeypress="if(event.key==='Enter') loadFileList(this.value)">
+                    <button onclick="loadFileList(document.getElementById('filePathInput').value)">刷新</button>
+                    <button onclick="uploadFile()">上传文件</button>
+                </div>
+                <ul id="fileList" class="file-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 终端模态框 -->
+    <div id="terminalModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>终端</h2>
+                <span class="close" onclick="closeTerminal()">&times;</span>
+            </div>
+            <div>
+                <div id="terminalOutput" class="terminal-output"></div>
+                <div class="terminal-input">
+                    <input type="text" id="terminalInput" placeholder="输入命令..." onkeypress="if(event.key==='Enter') sendTerminalCommand()">
+                    <button onclick="sendTerminalCommand()">发送</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
 
