@@ -113,6 +113,9 @@ func (h *WebSocketHandler) handleMessage(msg *protocol.Message, conn *websocket.
 	case "terminal_command":
 		h.handleTerminalCommand(msg, *deviceID)
 		return nil // 终端命令需要响应，但通过转发处理
+	case "app_install":
+		h.handleAppInstall(msg, *deviceID)
+		return nil // 应用安装需要响应，但通过转发处理
 	case "ping":
 		return h.handlePing()
 	default:
@@ -336,6 +339,33 @@ func (h *WebSocketHandler) handleTerminalCommand(msg *protocol.Message, controll
 	}
 
 	// 转发终端命令到被控端
+	controlledConn, ok := h.connectionService.GetConnection(controlledID)
+	if !ok {
+		return
+	}
+
+	if wsConn, ok := controlledConn.Conn.(*websocket.Conn); ok {
+		wsConn.WriteJSON(msg)
+	}
+}
+
+// 处理应用安装（从控制端转发到被控端）
+func (h *WebSocketHandler) handleAppInstall(msg *protocol.Message, controllerID string) {
+	var controlledID string
+	
+	// 如果消息包含 sessionID，使用 sessionID 查找被控端（支持多设备同时控制）
+	if msg.SessionID != "" {
+		controlledID = h.connectionService.GetControlledIDBySession(msg.SessionID)
+	} else {
+		// 否则使用旧的逻辑（向后兼容）
+		controlledID = h.connectionService.GetControlledID(controllerID)
+	}
+	
+	if controlledID == "" {
+		return
+	}
+
+	// 转发应用安装请求到被控端
 	controlledConn, ok := h.connectionService.GetConnection(controlledID)
 	if !ok {
 		return

@@ -12,5 +12,8 @@ class MainActivity : FlutterActivity() {
         
         // 注册输入控制插件
         flutterEngine.plugins.add(InputControlPlugin(this))
+        
+        // 注册应用安装插件
+        flutterEngine.plugins.add(AppInstallPlugin(this))
     }
 }

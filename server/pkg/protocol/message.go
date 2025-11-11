@@ -107,3 +107,15 @@ type NotificationData struct {
 	Action string `json:"action,omitempty"` // accept, reject
 }
 
+// AppInstallData 应用安装数据
+type AppInstallData struct {
+	APKData  string `json:"apk_data"`  // base64 encoded APK file
+	FileName string `json:"file_name"`
+}
+
+// AppInstallResponseData 应用安装响应数据
+type AppInstallResponseData struct {
+	Success bool   `json:"success"`
+	Message string `json:"message,omitempty"`
+}
+
