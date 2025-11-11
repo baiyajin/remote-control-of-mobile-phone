@@ -20,14 +20,18 @@ var upgrader = websocket.Upgrader{
 }
 
 type WebSocketHandler struct {
-	deviceService     *service.DeviceService
-	connectionService *service.ConnectionService
+	deviceService         *service.DeviceService
+	connectionService     *service.ConnectionService
+	historyService        *service.ConnectionHistoryService
+	sessionHistoryMap     map[string]string // sessionID -> historyID
 }
 
-func NewWebSocketHandler(deviceService *service.DeviceService, connectionService *service.ConnectionService) *WebSocketHandler {
+func NewWebSocketHandler(deviceService *service.DeviceService, connectionService *service.ConnectionService, historyService *service.ConnectionHistoryService) *WebSocketHandler {
 	return &WebSocketHandler{
 		deviceService:     deviceService,
 		connectionService: connectionService,
+		historyService:    historyService,
+		sessionHistoryMap: make(map[string]string),
 	}
 }
 
@@ -67,8 +71,23 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 		}
 	}
 
-	// 清理连接
+	// 清理连接和会话
 	if deviceID != "" {
+		// 查找并结束连接历史
+		controlledID := h.connectionService.GetControlledID(deviceID)
+		if controlledID != "" {
+			// 找到对应的会话
+			for sessionID, historyID := range h.sessionHistoryMap {
+				session, _ := h.connectionService.GetSession(sessionID)
+				if session != nil && (session.ControllerID == deviceID || session.ControlledID == deviceID) {
+					h.historyService.EndHistory(historyID)
+					delete(h.sessionHistoryMap, sessionID)
+					h.connectionService.RemoveSession(sessionID)
+					break
+				}
+			}
+		}
+		
 		h.connectionService.RemoveConnection(deviceID)
 		log.Printf("设备 %s 断开连接", deviceID)
 	}
@@ -188,6 +207,12 @@ func (h *WebSocketHandler) handleConnectRequest(msg *protocol.Message, conn *web
 
 	// 创建会话
 	h.connectionService.CreateSession(sessionID, controllerID, data.DeviceID)
+
+	// 创建连接历史记录
+	history, err := h.historyService.CreateHistory(controllerID, data.DeviceID)
+	if err == nil {
+		h.sessionHistoryMap[sessionID] = history.ID
+	}
 
 	log.Printf("连接请求: %s -> %s (会话: %s)", controllerID, data.DeviceID, sessionID)
 

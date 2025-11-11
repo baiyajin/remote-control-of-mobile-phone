@@ -24,10 +24,11 @@ func main() {
 	deviceService := service.NewDeviceService(db)
 	connectionService := service.NewConnectionService()
 	logService := service.NewLogService(1000)
+	historyService := service.NewConnectionHistoryService(db)
 
 	// 初始化处理器
-	wsHandler := handler.NewWebSocketHandler(deviceService, connectionService)
-	httpHandler := handler.NewHTTPHandler(deviceService, connectionService, logService)
+	wsHandler := handler.NewWebSocketHandler(deviceService, connectionService, historyService)
+	httpHandler := handler.NewHTTPHandler(deviceService, connectionService, logService, historyService)
 
 	// 设置路由
 	router := gin.Default()
@@ -48,6 +49,9 @@ func main() {
 		// 设备管理
 		api.GET("/devices", httpHandler.GetDeviceList)
 		api.POST("/devices/register", httpHandler.RegisterDevice)
+
+		// 连接历史
+		api.GET("/connection/history", httpHandler.GetConnectionHistory)
 	}
 
 	// 启动服务器

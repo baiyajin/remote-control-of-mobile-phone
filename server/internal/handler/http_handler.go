@@ -13,14 +13,16 @@ type HTTPHandler struct {
 	deviceService     *service.DeviceService
 	connectionService *service.ConnectionService
 	logService        *service.LogService
+	historyService    *service.ConnectionHistoryService
 	configManager     *config.ConfigManager
 }
 
-func NewHTTPHandler(deviceService *service.DeviceService, connectionService *service.ConnectionService, logService *service.LogService) *HTTPHandler {
+func NewHTTPHandler(deviceService *service.DeviceService, connectionService *service.ConnectionService, logService *service.LogService, historyService *service.ConnectionHistoryService) *HTTPHandler {
 	return &HTTPHandler{
 		deviceService:     deviceService,
 		connectionService: connectionService,
 		logService:        logService,
+		historyService:    historyService,
 		configManager:     config.GetConfigManager(),
 	}
 }
@@ -96,6 +98,26 @@ func (h *HTTPHandler) GetDeviceList(c *gin.Context) {
 func (h *HTTPHandler) RegisterDevice(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "设备注册功能待实现（通过 WebSocket）",
+	})
+}
+
+func (h *HTTPHandler) GetConnectionHistory(c *gin.Context) {
+	limit := 50
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if parsedLimit, err := parseInt(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	histories, err := h.historyService.GetHistoryList(limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"histories": histories,
+		"count": len(histories),
 	})
 }
 
