@@ -240,8 +240,16 @@ func (h *WebSocketHandler) handleConnectRequest(msg *protocol.Message, conn *web
 
 // 处理屏幕帧（从被控端转发到控制端）
 func (h *WebSocketHandler) handleScreenFrame(msg *protocol.Message, controlledID string) {
-	// 找到控制端
-	controllerID := h.connectionService.GetControllerID(controlledID)
+	var controllerID string
+	
+	// 如果消息包含 sessionID，使用 sessionID 查找控制端（支持多设备同时控制）
+	if msg.SessionID != "" {
+		controllerID = h.connectionService.GetControllerIDBySession(msg.SessionID)
+	} else {
+		// 否则使用旧的逻辑（向后兼容）
+		controllerID = h.connectionService.GetControllerID(controlledID)
+	}
+	
 	if controllerID == "" {
 		return
 	}
@@ -259,8 +267,16 @@ func (h *WebSocketHandler) handleScreenFrame(msg *protocol.Message, controlledID
 
 // 处理输入控制（从控制端转发到被控端）
 func (h *WebSocketHandler) handleInputControl(msg *protocol.Message, controllerID string) {
-	// 找到被控端
-	controlledID := h.connectionService.GetControlledID(controllerID)
+	var controlledID string
+	
+	// 如果消息包含 sessionID，使用 sessionID 查找被控端（支持多设备同时控制）
+	if msg.SessionID != "" {
+		controlledID = h.connectionService.GetControlledIDBySession(msg.SessionID)
+	} else {
+		// 否则使用旧的逻辑（向后兼容）
+		controlledID = h.connectionService.GetControlledID(controllerID)
+	}
+	
 	if controlledID == "" {
 		return
 	}
@@ -278,8 +294,16 @@ func (h *WebSocketHandler) handleInputControl(msg *protocol.Message, controllerI
 
 // 处理文件操作（从控制端转发到被控端）
 func (h *WebSocketHandler) handleFileOperation(msg *protocol.Message, controllerID string) {
-	// 找到被控端
-	controlledID := h.connectionService.GetControlledID(controllerID)
+	var controlledID string
+	
+	// 如果消息包含 sessionID，使用 sessionID 查找被控端（支持多设备同时控制）
+	if msg.SessionID != "" {
+		controlledID = h.connectionService.GetControlledIDBySession(msg.SessionID)
+	} else {
+		// 否则使用旧的逻辑（向后兼容）
+		controlledID = h.connectionService.GetControlledID(controllerID)
+	}
+	
 	if controlledID == "" {
 		return
 	}
@@ -297,8 +321,16 @@ func (h *WebSocketHandler) handleFileOperation(msg *protocol.Message, controller
 
 // 处理终端命令（从控制端转发到被控端）
 func (h *WebSocketHandler) handleTerminalCommand(msg *protocol.Message, controllerID string) {
-	// 找到被控端
-	controlledID := h.connectionService.GetControlledID(controllerID)
+	var controlledID string
+	
+	// 如果消息包含 sessionID，使用 sessionID 查找被控端（支持多设备同时控制）
+	if msg.SessionID != "" {
+		controlledID = h.connectionService.GetControlledIDBySession(msg.SessionID)
+	} else {
+		// 否则使用旧的逻辑（向后兼容）
+		controlledID = h.connectionService.GetControlledID(controllerID)
+	}
+	
 	if controlledID == "" {
 		return
 	}

@@ -111,3 +111,38 @@ func (s *ConnectionService) GetControlledID(controllerID string) string {
 	return ""
 }
 
+// 获取控制端的所有会话（支持多设备同时控制）
+func (s *ConnectionService) GetControllerSessions(controllerID string) []*Session {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var sessions []*Session
+	for _, session := range s.sessions {
+		if session.ControllerID == controllerID {
+			sessions = append(sessions, session)
+		}
+	}
+	return sessions
+}
+
+// 根据会话ID获取被控端ID
+func (s *ConnectionService) GetControlledIDBySession(sessionID string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	session, ok := s.sessions[sessionID]
+	if !ok {
+		return ""
+	}
+	return session.ControlledID
+}
+
+// 根据会话ID获取控制端ID
+func (s *ConnectionService) GetControllerIDBySession(sessionID string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	session, ok := s.sessions[sessionID]
+	if !ok {
+		return ""
+	}
+	return session.ControllerID
+}
+
