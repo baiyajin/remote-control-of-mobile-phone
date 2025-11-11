@@ -1,0 +1,167 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import '../models/device.dart';
+
+class DeviceService extends ChangeNotifier {
+  WebSocketChannel? _channel;
+  List<Device> _devices = [];
+  String? _currentDeviceId;
+  bool _connected = false;
+
+  List<Device> get devices => _devices;
+  bool get connected => _connected;
+  String? get currentDeviceId => _currentDeviceId;
+
+  // 服务器地址（可以从配置读取）
+  String _serverUrl = 'ws://localhost:8080/ws';
+
+  void setServerUrl(String url) {
+    _serverUrl = url;
+  }
+
+  Future<void> connect() async {
+    if (_connected && _channel != null) {
+      return;
+    }
+
+    try {
+      _channel = WebSocketChannel.connect(Uri.parse(_serverUrl));
+      _connected = true;
+      notifyListeners();
+
+      // 监听消息
+      _channel!.stream.listen(
+        (message) {
+          _handleMessage(message);
+        },
+        onError: (error) {
+          print('WebSocket 错误: $error');
+          _connected = false;
+          notifyListeners();
+        },
+        onDone: () {
+          print('WebSocket 连接关闭');
+          _connected = false;
+          notifyListeners();
+        },
+      );
+
+      // 注册当前设备
+      await registerDevice();
+    } catch (e) {
+      print('连接失败: $e');
+      _connected = false;
+      notifyListeners();
+    }
+  }
+
+  void disconnect() {
+    _channel?.sink.close();
+    _channel = null;
+    _connected = false;
+    notifyListeners();
+  }
+
+  Future<void> registerDevice() async {
+    if (!_connected) return;
+
+    // 生成设备ID（实际应该从本地存储读取或生成）
+    final deviceId = _currentDeviceId ?? 'device-${DateTime.now().millisecondsSinceEpoch}';
+    _currentDeviceId = deviceId;
+
+    final message = {
+      'type': 'device_register',
+      'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'data': {
+        'device_id': deviceId,
+        'device_name': 'Flutter-Client',
+        'device_type': _getPlatformType(),
+        'ip_address': '',
+        'capabilities': ['screen', 'input', 'file', 'terminal'],
+      },
+    };
+
+    _channel?.sink.add(jsonEncode(message));
+  }
+
+  Future<void> requestDeviceList() async {
+    if (!_connected) return;
+
+    final message = {
+      'type': 'device_list',
+      'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'data': {},
+    };
+
+    _channel?.sink.add(jsonEncode(message));
+  }
+
+  void _handleMessage(dynamic message) {
+    try {
+      final data = jsonDecode(message.toString());
+      final type = data['type'] as String;
+
+      switch (type) {
+        case 'device_list':
+          _handleDeviceList(data['data']);
+          break;
+        case 'device_register_response':
+          print('设备注册成功');
+          // 注册成功后请求设备列表
+          requestDeviceList();
+          break;
+        default:
+          print('未知消息类型: $type');
+      }
+    } catch (e) {
+      print('处理消息失败: $e');
+    }
+  }
+
+  void _handleDeviceList(Map<String, dynamic> data) {
+    final devicesJson = data['devices'] as List<dynamic>;
+    _devices = devicesJson
+        .map((json) => Device.fromJson(json as Map<String, dynamic>))
+        .toList();
+    notifyListeners();
+  }
+
+  Future<void> connectToDevice(String deviceId) async {
+    if (!_connected) return;
+
+    final message = {
+      'type': 'connect_request',
+      'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'data': {
+        'device_id': deviceId,
+      },
+    };
+
+    _channel?.sink.add(jsonEncode(message));
+  }
+
+  String _getPlatformType() {
+    if (kIsWeb) {
+      return 'web';
+    }
+    if (Platform.isWindows) {
+      return 'windows';
+    }
+    if (Platform.isAndroid) {
+      return 'android';
+    }
+    if (Platform.isIOS) {
+      return 'ios';
+    }
+    if (Platform.isMacOS) {
+      return 'macos';
+    }
+    if (Platform.isLinux) {
+      return 'linux';
+    }
+    return 'unknown';
+  }
+}
+
