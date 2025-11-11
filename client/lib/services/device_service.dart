@@ -107,6 +107,8 @@ class DeviceService extends ChangeNotifier {
   Function(Map<String, dynamic>)? onNotificationReceived;
   // 输入控制接收回调（被控端）
   Function(Map<String, dynamic>)? onInputControlReceived;
+  // 终端输出接收回调
+  Function(Map<String, dynamic>)? onTerminalOutputReceived;
 
   void _handleMessage(dynamic message) {
     try {
@@ -134,6 +136,9 @@ class DeviceService extends ChangeNotifier {
         case 'input_mouse':
         case 'input_keyboard':
           onInputControlReceived?.call(data);
+          break;
+        case 'terminal_output':
+          onTerminalOutputReceived?.call(data['data'] as Map<String, dynamic>);
           break;
         default:
           print('未知消息类型: $type');
