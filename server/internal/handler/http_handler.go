@@ -96,8 +96,11 @@ func (h *HTTPHandler) GetDeviceList(c *gin.Context) {
 }
 
 func (h *HTTPHandler) RegisterDevice(c *gin.Context) {
+	// 设备注册通过 WebSocket 进行，HTTP 接口仅用于兼容性
+	// 实际注册在 WebSocket 连接时自动完成
 	c.JSON(http.StatusOK, gin.H{
-		"message": "设备注册功能待实现（通过 WebSocket）",
+		"message": "设备注册请通过 WebSocket 连接进行",
+		"websocket_endpoint": "/ws",
 	})
 }
 
