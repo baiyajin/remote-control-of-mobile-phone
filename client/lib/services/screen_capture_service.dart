@@ -27,11 +27,18 @@ class ScreenCaptureService {
   // 捕获一帧屏幕
   Future<Uint8List?> captureFrame() async {
     try {
-      final result = await _channel.invokeMethod<Uint8List>('captureFrame');
+      // 尝试 captureScreen 方法（Android）
+      final result = await _channel.invokeMethod<Uint8List>('captureScreen');
       return result;
     } catch (e) {
-      debugPrint('捕获屏幕帧失败: $e');
-      return null;
+      try {
+        // 回退到 captureFrame 方法（Windows）
+        final result = await _channel.invokeMethod<Uint8List>('captureFrame');
+        return result;
+      } catch (e2) {
+        debugPrint('捕获屏幕帧失败: $e2');
+        return null;
+      }
     }
   }
 
