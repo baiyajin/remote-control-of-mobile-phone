@@ -6,6 +6,8 @@
 #endif
 
 #include "flutter/generated_plugin_registrant.h"
+#include "screen_capture_plugin.h"
+#include "input_control_plugin.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
@@ -72,6 +74,10 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+  
+  // 注册自定义插件
+  RegisterScreenCapturePlugin(FL_PLUGIN_REGISTRY(view));
+  RegisterInputControlPlugin(FL_PLUGIN_REGISTRY(view));
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

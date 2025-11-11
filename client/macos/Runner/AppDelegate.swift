@@ -10,4 +10,12 @@ class AppDelegate: FlutterAppDelegate {
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
     return true
   }
+  
+  override func applicationDidFinishLaunching(_ notification: Notification) {
+    GeneratedPluginRegistrant.register(with: self)
+    
+    // 注册自定义插件
+    ScreenCapturePlugin.register(with: registrar(forPlugin: "ScreenCapturePlugin")!)
+    InputControlPlugin.register(with: registrar(forPlugin: "InputControlPlugin")!)
+  }
 }
