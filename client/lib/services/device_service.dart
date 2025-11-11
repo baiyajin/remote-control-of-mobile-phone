@@ -131,7 +131,8 @@ class DeviceService extends ChangeNotifier {
         case 'notification':
           onNotificationReceived?.call(data['data'] as Map<String, dynamic>);
           break;
-        case 'input_mouse', 'input_keyboard':
+        case 'input_mouse':
+        case 'input_keyboard':
           onInputControlReceived?.call(data);
           break;
         default:
