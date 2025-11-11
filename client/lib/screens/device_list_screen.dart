@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/device_service.dart';
 import '../models/device.dart';
+import 'remote_control_screen.dart';
 
 class DeviceListScreen extends StatefulWidget {
   const DeviceListScreen({super.key});
@@ -145,10 +146,11 @@ class _DeviceCard extends StatelessWidget {
         trailing: device.online
             ? ElevatedButton(
                 onPressed: () {
-                  service.connectToDevice(device.id);
-                  // TODO: 导航到远程控制界面
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('正在连接 ${device.name}...')),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => RemoteControlScreen(device: device),
+                    ),
                   );
                 },
                 child: const Text('连接'),
