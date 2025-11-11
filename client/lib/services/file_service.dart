@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'device_service.dart';
 
@@ -6,8 +7,28 @@ class FileService {
 
   FileService(this._deviceService);
 
-  // 获取文件列表
+  // 获取文件列表（带响应等待）
   Future<List<FileInfo>> getFileList(String path) async {
+    final completer = Completer<List<FileInfo>>();
+    final requestId = DateTime.now().millisecondsSinceEpoch.toString();
+    
+    // 设置响应回调
+    _deviceService.onFileListReceived = (data) {
+      final responsePath = data['path'] as String?;
+      if (responsePath == path) {
+        final filesJson = data['files'] as List<dynamic>?;
+        if (filesJson != null) {
+          final files = filesJson
+              .map((json) => FileInfo.fromJson(json as Map<String, dynamic>))
+              .toList();
+          completer.complete(files);
+        } else {
+          completer.complete([]);
+        }
+        _deviceService.onFileListReceived = null; // 清除回调
+      }
+    };
+    
     final message = {
       'type': 'file_list',
       'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
@@ -18,8 +39,14 @@ class FileService {
 
     _deviceService.channel?.sink.add(jsonEncode(message));
     
-    // 这里应该等待响应，简化处理
-    return [];
+    // 等待响应（超时5秒）
+    return completer.future.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        _deviceService.onFileListReceived = null;
+        return <FileInfo>[];
+      },
+    );
   }
 
   // 上传文件
@@ -37,8 +64,24 @@ class FileService {
     _deviceService.channel?.sink.add(jsonEncode(message));
   }
 
-  // 下载文件
+  // 下载文件（带响应等待）
   Future<List<int>?> downloadFile(String filePath) async {
+    final completer = Completer<List<int>?>();
+    
+    // 设置响应回调
+    _deviceService.onFileDownloadReceived = (data) {
+      final responsePath = data['path'] as String?;
+      if (responsePath == filePath) {
+        final fileDataBase64 = data['file_data'] as String?;
+        if (fileDataBase64 != null && fileDataBase64.isNotEmpty) {
+          completer.complete(base64Decode(fileDataBase64));
+        } else {
+          completer.complete(null);
+        }
+        _deviceService.onFileDownloadReceived = null; // 清除回调
+      }
+    };
+    
     final message = {
       'type': 'file_download',
       'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
@@ -49,8 +92,14 @@ class FileService {
 
     _deviceService.channel?.sink.add(jsonEncode(message));
     
-    // 这里应该等待响应，简化处理
-    return null;
+    // 等待响应（超时30秒）
+    return completer.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        _deviceService.onFileDownloadReceived = null;
+        return null;
+      },
+    );
   }
 
   // 删除文件
