@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../services/device_service.dart';
 import '../services/file_service.dart';
 import '../models/device.dart';
@@ -143,25 +145,62 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // 上传文件（简化处理）
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('上传文件'),
-              content: const Text('文件上传功能待实现'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('确定'),
-                ),
-              ],
-            ),
-          );
-        },
+        onPressed: () => _showUploadDialog(),
         child: const Icon(Icons.upload),
       ),
     );
+  }
+
+  void _showUploadDialog() async {
+    // 选择文件
+    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    
+    if (result != null && result.files.single.path != null) {
+      final filePath = result.files.single.path!;
+      final fileName = result.files.single.name;
+      final file = File(filePath);
+      
+      try {
+        final fileData = await file.readAsBytes();
+        
+        // 显示上传进度
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text('正在上传: $fileName'),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        // 上传文件
+        await _fileService.uploadFile(_currentPath, fileName, fileData);
+        
+        if (mounted) {
+          Navigator.pop(context); // 关闭进度对话框
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('文件上传成功')),
+          );
+          // 刷新文件列表
+          _loadFiles(_currentPath);
+        }
+      } catch (e) {
+        if (mounted) {
+          Navigator.pop(context); // 关闭进度对话框
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('文件上传失败: $e')),
+          );
+        }
+      }
+    }
   }
 }
 
