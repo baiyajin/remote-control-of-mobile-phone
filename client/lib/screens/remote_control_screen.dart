@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../services/device_service.dart';
 import '../models/device.dart';
 import 'file_manager_screen.dart';
+import 'terminal_screen.dart';
 
 class RemoteControlScreen extends StatefulWidget {
   final Device device;
@@ -209,7 +210,12 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
                   IconButton(
                     icon: const Icon(Icons.terminal),
                     onPressed: () {
-                      // 终端
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TerminalScreen(device: widget.device),
+                        ),
+                      );
                     },
                     tooltip: '终端',
                   ),
