@@ -119,6 +119,8 @@ class DeviceService extends ChangeNotifier {
   Function(Map<String, dynamic>)? onFileDeleteReceived;
   // 终端命令接收回调
   Function(Map<String, dynamic>)? onTerminalCommandReceived;
+  // 文件上传响应接收回调
+  Function(Map<String, dynamic>)? onFileUploadResponseReceived;
 
   void _handleMessage(dynamic message) {
     try {
