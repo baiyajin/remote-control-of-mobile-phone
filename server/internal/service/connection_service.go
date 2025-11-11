@@ -9,14 +9,22 @@ type Connection struct {
 	Conn     interface{} // WebSocket connection
 }
 
+type Session struct {
+	SessionID    string
+	ControllerID string
+	ControlledID string
+}
+
 type ConnectionService struct {
 	connections map[string]*Connection
+	sessions    map[string]*Session // sessionID -> Session
 	mu          sync.RWMutex
 }
 
 func NewConnectionService() *ConnectionService {
 	return &ConnectionService{
 		connections: make(map[string]*Connection),
+		sessions:    make(map[string]*Session),
 	}
 }
 
@@ -56,5 +64,50 @@ func (s *ConnectionService) GetAllConnections() map[string]*Connection {
 		result[k] = v
 	}
 	return result
+}
+
+func (s *ConnectionService) CreateSession(sessionID, controllerID, controlledID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sessions[sessionID] = &Session{
+		SessionID:    sessionID,
+		ControllerID: controllerID,
+		ControlledID: controlledID,
+	}
+}
+
+func (s *ConnectionService) GetSession(sessionID string) (*Session, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	session, ok := s.sessions[sessionID]
+	return session, ok
+}
+
+func (s *ConnectionService) RemoveSession(sessionID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.sessions, sessionID)
+}
+
+func (s *ConnectionService) GetControllerID(controlledID string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, session := range s.sessions {
+		if session.ControlledID == controlledID {
+			return session.ControllerID
+		}
+	}
+	return ""
+}
+
+func (s *ConnectionService) GetControlledID(controllerID string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, session := range s.sessions {
+		if session.ControllerID == controllerID {
+			return session.ControlledID
+		}
+	}
+	return ""
 }
 

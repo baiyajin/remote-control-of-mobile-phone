@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/device_service.dart';
-import '../services/input_control_service.dart';
 import '../models/device.dart';
 
 class RemoteControlScreen extends StatefulWidget {
@@ -17,10 +16,10 @@ class RemoteControlScreen extends StatefulWidget {
 }
 
 class _RemoteControlScreenState extends State<RemoteControlScreen> {
-  final InputControlService _inputService = InputControlService();
-  StreamSubscription<Uint8List>? _screenStream;
+  StreamSubscription? _screenFrameSubscription;
   ui.Image? _currentImage;
   bool _isControlling = false;
+  String? _sessionId;
 
   @override
   void initState() {
@@ -30,31 +29,47 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
 
   @override
   void dispose() {
-    _screenStream?.cancel();
+    _screenFrameSubscription?.cancel();
+    final deviceService = context.read<DeviceService>();
+    deviceService.onScreenFrameReceived = null;
+    deviceService.onConnectResponse = null;
     super.dispose();
   }
 
   Future<void> _connectToDevice() async {
     final deviceService = context.read<DeviceService>();
-    await deviceService.connectToDevice(widget.device.id);
     
-    // 开始接收屏幕流（这里简化处理，实际应该通过 WebSocket 接收）
-    _startReceivingScreen();
-  }
-
-  void _startReceivingScreen() {
-    // 这里应该通过 WebSocket 接收屏幕帧
-    // 目前先使用本地屏幕捕获作为示例（被控端）
-    if (mounted) {
-      setState(() {
-        _isControlling = true;
-      });
-    }
+    // 设置屏幕帧接收回调
+    deviceService.onScreenFrameReceived = (data) {
+      _handleScreenFrame(data);
+    };
+    
+    // 设置连接响应回调
+    deviceService.onConnectResponse = (data) {
+      final status = data['status'] as String;
+      if (status == 'success') {
+        _sessionId = data['session_id'] as String?;
+        if (mounted) {
+          setState(() {
+            _isControlling = true;
+          });
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['message'] as String? ?? '连接失败')),
+        );
+      }
+    };
+    
+    await deviceService.connectToDevice(widget.device.id);
   }
 
   // 处理屏幕帧（通过 WebSocket 接收）
-  Future<void> _handleScreenFrame(Uint8List frameData) async {
+  Future<void> _handleScreenFrame(Map<String, dynamic> data) async {
     try {
+      final frameDataBase64 = data['frame_data'] as String;
+      final frameData = base64Decode(frameDataBase64);
+      
       final codec = await ui.instantiateImageCodec(frameData);
       final frame = await codec.getNextFrame();
       if (mounted) {
@@ -85,7 +100,9 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
     final screenX = localPosition.dx * scaleX;
     final screenY = localPosition.dy * scaleY;
     
-    _inputService.moveMouse(screenX, screenY);
+    // 通过 WebSocket 发送输入控制
+    final deviceService = context.read<DeviceService>();
+    deviceService.sendMouseInput('move', screenX, screenY);
   }
 
   void _onTapDown(TapDownDetails details) {
@@ -105,7 +122,9 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
     final screenX = localPosition.dx * scaleX;
     final screenY = localPosition.dy * scaleY;
     
-    _inputService.clickMouse(screenX, screenY, 'left');
+    // 通过 WebSocket 发送输入控制
+    final deviceService = context.read<DeviceService>();
+    deviceService.sendMouseInput('click', screenX, screenY, button: 'left');
   }
 
   void _onDoubleTap() {
@@ -121,7 +140,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            _screenStream?.cancel();
+            _screenFrameSubscription?.cancel();
             Navigator.pop(context);
           },
         ),
@@ -215,7 +234,8 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
           ),
           TextButton(
             onPressed: () {
-              _inputService.typeText(textController.text);
+              final deviceService = context.read<DeviceService>();
+              deviceService.sendKeyboardInput('keypress', textController.text);
               Navigator.pop(context);
             },
             child: const Text('发送'),
