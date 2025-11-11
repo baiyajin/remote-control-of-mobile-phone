@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/device_service.dart';
 import '../models/device.dart';
 import 'remote_control_screen.dart';
+import 'connection_history_screen.dart';
 
 class DeviceListScreen extends StatefulWidget {
   const DeviceListScreen({super.key});
@@ -27,6 +28,18 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
       appBar: AppBar(
         title: const Text('远程控制'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ConnectionHistoryScreen(),
+                ),
+              );
+            },
+            tooltip: '连接历史',
+          ),
           Consumer<DeviceService>(
             builder: (context, service, _) {
               return IconButton(
