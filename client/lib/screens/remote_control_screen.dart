@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/device_service.dart';
 import '../models/device.dart';
+import 'file_manager_screen.dart';
 
 class RemoteControlScreen extends StatefulWidget {
   final Device device;
@@ -196,7 +197,12 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
                   IconButton(
                     icon: const Icon(Icons.file_copy),
                     onPressed: () {
-                      // 文件管理
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => FileManagerScreen(device: widget.device),
+                        ),
+                      );
                     },
                     tooltip: '文件管理',
                   ),
