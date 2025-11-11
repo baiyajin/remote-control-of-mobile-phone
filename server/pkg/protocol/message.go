@@ -7,6 +7,7 @@ type Message struct {
 	Type      string          `json:"type"`
 	Timestamp int64           `json:"timestamp"`
 	Data      json.RawMessage `json:"data"`
+	SessionID string          `json:"session_id,omitempty"` // 会话ID，用于多设备同时控制
 }
 
 // DeviceRegisterData 设备注册数据
