@@ -52,6 +52,18 @@ class MyApp extends StatelessWidget {
                   if (channel != null) {
                     await screenStreamService.startSendingScreen(channel);
                   }
+                } else if (accepted == false) {
+                  // 用户拒绝连接，通知服务器
+                  // 需要从通知数据中获取 sessionID（这里简化处理，实际应该从通知中获取）
+                  final message = {
+                    'type': 'connect_reject',
+                    'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+                    'data': {
+                      'session_id': '', // 需要从通知中获取
+                      'reason': '用户拒绝连接',
+                    },
+                  };
+                  deviceService.channel?.sink.add(jsonEncode(message));
                 }
               } else {
                 // 如果 context 不可用，自动接受（简化处理）

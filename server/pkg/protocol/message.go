@@ -43,9 +43,15 @@ type ConnectRequestData struct {
 
 // ConnectResponseData 连接响应数据
 type ConnectResponseData struct {
-	Status    string `json:"status"` // success, failed
+	Status    string `json:"status"` // success, failed, rejected
 	SessionID string `json:"session_id,omitempty"`
 	Message   string `json:"message,omitempty"`
+}
+
+// ConnectRejectData 连接拒绝数据
+type ConnectRejectData struct {
+	SessionID string `json:"session_id"`
+	Reason    string `json:"reason,omitempty"`
 }
 
 // ScreenFrameData 屏幕帧数据

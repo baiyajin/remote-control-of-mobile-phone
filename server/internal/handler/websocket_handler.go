@@ -101,13 +101,16 @@ func (h *WebSocketHandler) handleMessage(msg *protocol.Message, conn *websocket.
 		return h.handleDeviceList()
 	case "connect_request":
 		return h.handleConnectRequest(msg, conn, *deviceID)
+	case "connect_reject":
+		h.handleConnectReject(msg, *deviceID)
+		return nil
 	case "screen_frame":
 		h.handleScreenFrame(msg, *deviceID)
 		return nil // 屏幕帧不需要响应
 	case "input_mouse", "input_keyboard":
 		h.handleInputControl(msg, *deviceID)
 		return nil // 输入控制不需要响应
-	case "file_list", "file_upload", "file_download", "file_delete":
+	case "file_list", "file_upload", "file_download", "file_delete", "file_rename", "file_move", "file_create_directory":
 		h.handleFileOperation(msg, *deviceID)
 		return nil // 文件操作需要响应，但通过转发处理
 	case "terminal_command":
@@ -239,6 +242,45 @@ func (h *WebSocketHandler) handleConnectRequest(msg *protocol.Message, conn *web
 		Status:    "success",
 		SessionID: sessionID,
 	})
+}
+
+// 处理连接拒绝（从被控端）
+func (h *WebSocketHandler) handleConnectReject(msg *protocol.Message, controlledID string) {
+	var data protocol.ConnectRejectData
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		log.Printf("解析连接拒绝数据失败: %v", err)
+		return
+	}
+
+	// 查找控制端
+	controllerID := h.connectionService.GetControllerIDBySession(data.SessionID)
+	if controllerID == "" {
+		return
+	}
+
+	// 通知控制端连接被拒绝
+	controllerConn, ok := h.connectionService.GetConnection(controllerID)
+	if !ok {
+		return
+	}
+
+	rejectMsg := h.successResponse("connect_response", protocol.ConnectResponseData{
+		Status:  "rejected",
+		Message: data.Reason,
+	})
+
+	if wsConn, ok := controllerConn.Conn.(*websocket.Conn); ok {
+		wsConn.WriteJSON(rejectMsg)
+	}
+
+	// 清理会话和历史
+	if historyID, ok := h.sessionHistoryMap[data.SessionID]; ok {
+		h.historyService.EndHistory(historyID)
+		delete(h.sessionHistoryMap, data.SessionID)
+	}
+	h.connectionService.RemoveSession(data.SessionID)
+
+	log.Printf("连接被拒绝: %s -> %s (会话: %s)", controllerID, controlledID, data.SessionID)
 }
 
 // 处理屏幕帧（从被控端转发到控制端）

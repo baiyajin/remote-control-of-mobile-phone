@@ -139,6 +139,11 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
                                         tooltip: '下载',
                                       ),
                                       IconButton(
+                                        icon: const Icon(Icons.edit),
+                                        onPressed: () => _showRenameDialog(file),
+                                        tooltip: '重命名',
+                                      ),
+                                      IconButton(
                                         icon: const Icon(Icons.delete),
                                         onPressed: () => _deleteFile(file),
                                         tooltip: '删除',
@@ -147,11 +152,21 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
                                     ],
                                   )
                                 : file.type == 'directory'
-                                    ? IconButton(
-                                        icon: const Icon(Icons.delete),
-                                        onPressed: () => _deleteFile(file),
-                                        tooltip: '删除',
-                                        color: Colors.red,
+                                    ? Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.edit),
+                                            onPressed: () => _showRenameDialog(file),
+                                            tooltip: '重命名',
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete),
+                                            onPressed: () => _deleteFile(file),
+                                            tooltip: '删除',
+                                            color: Colors.red,
+                                          ),
+                                        ],
                                       )
                                     : null,
                           );
@@ -160,9 +175,23 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showUploadDialog(),
-        child: const Icon(Icons.upload),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
+            heroTag: "create_folder",
+            onPressed: () => _showCreateFolderDialog(),
+            child: const Icon(Icons.create_new_folder),
+            tooltip: '创建文件夹',
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton(
+            heroTag: "upload",
+            onPressed: () => _showUploadDialog(),
+            child: const Icon(Icons.upload),
+            tooltip: '上传文件',
+          ),
+        ],
       ),
     );
   }
@@ -331,6 +360,99 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
         }
       }
     }
+  }
+
+  void _showCreateFolderDialog() {
+    final nameController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('创建文件夹'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            hintText: '文件夹名称',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final folderName = nameController.text.trim();
+              if (folderName.isNotEmpty) {
+                final path = '$_currentPath\\$folderName';
+                final success = await _fileService.createDirectory(path);
+                Navigator.pop(context);
+                if (mounted) {
+                  if (success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('文件夹创建成功')),
+                    );
+                    _loadFiles(_currentPath);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('文件夹创建失败')),
+                    );
+                  }
+                }
+              }
+            },
+            child: const Text('创建'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showRenameDialog(FileInfo file) {
+    final nameController = TextEditingController(text: file.name);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('重命名'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            hintText: '新名称',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final newName = nameController.text.trim();
+              if (newName.isNotEmpty && newName != file.name) {
+                final parentPath = file.path.substring(0, file.path.lastIndexOf('\\'));
+                final newPath = '$parentPath\\$newName';
+                final success = await _fileService.renameFile(file.path, newPath);
+                Navigator.pop(context);
+                if (mounted) {
+                  if (success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('重命名成功')),
+                    );
+                    _loadFiles(_currentPath);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('重命名失败')),
+                    );
+                  }
+                }
+              }
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

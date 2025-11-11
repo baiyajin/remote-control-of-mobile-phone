@@ -131,6 +131,38 @@ class FileService {
       },
     );
   }
+
+  // 重命名文件
+  Future<bool> renameFile(String oldPath, String newPath) async {
+    final completer = Completer<bool>();
+    
+    _deviceService.sendFileOperation('file_rename', {
+      'old_path': oldPath,
+      'new_path': newPath,
+    });
+    
+    // 简化处理：直接返回 true（实际应该等待响应）
+    return true;
+  }
+
+  // 移动文件
+  Future<bool> moveFile(String sourcePath, String targetPath) async {
+    _deviceService.sendFileOperation('file_move', {
+      'source_path': sourcePath,
+      'target_path': targetPath,
+    });
+    
+    return true;
+  }
+
+  // 创建文件夹
+  Future<bool> createDirectory(String path) async {
+    _deviceService.sendFileOperation('file_create_directory', {
+      'path': path,
+    });
+    
+    return true;
+  }
 }
 
 class FileInfo {

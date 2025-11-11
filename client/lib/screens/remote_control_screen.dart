@@ -34,6 +34,18 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
     final deviceService = context.read<DeviceService>();
     deviceService.onScreenFrameReceived = null;
     deviceService.onConnectResponse = null;
+    
+    // 断开连接时通知被控端停止发送屏幕（通过发送断开消息）
+    if (deviceService.currentSessionId != null) {
+      final disconnectMsg = {
+        'type': 'disconnect_request',
+        'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        'session_id': deviceService.currentSessionId,
+        'data': {},
+      };
+      deviceService.channel?.sink.add(jsonEncode(disconnectMsg));
+    }
+    
     super.dispose();
   }
 
@@ -110,6 +122,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
     
     final renderBox = context.findRenderObject() as RenderBox;
     final localPosition = renderBox.globalToLocal(details.globalPosition);
+    _lastTapPosition = localPosition; // 保存点击位置用于双击
     
     final screenWidth = _currentImage?.width ?? 1920;
     final screenHeight = _currentImage?.height ?? 1080;
@@ -126,13 +139,40 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
     final deviceService = context.read<DeviceService>();
     deviceService.sendMouseInput('click', screenX, screenY, button: 'left');
   }
+  
+  void _onLongPress() {
+    if (!_isControlling) return;
+    
+    // 长按触发右键点击
+    final renderBox = context.findRenderObject() as RenderBox;
+    final localPosition = renderBox.globalToLocal(
+      Offset(MediaQuery.of(context).size.width / 2, 
+             MediaQuery.of(context).size.height / 2)
+    );
+    
+    final screenWidth = _currentImage?.width ?? 1920;
+    final screenHeight = _currentImage?.height ?? 1080;
+    final displayWidth = MediaQuery.of(context).size.width;
+    final displayHeight = MediaQuery.of(context).size.height - 100;
+    
+    final scaleX = screenWidth / displayWidth;
+    final scaleY = screenHeight / displayHeight;
+    
+    final screenX = localPosition.dx * scaleX;
+    final screenY = localPosition.dy * scaleY;
+    
+    final deviceService = context.read<DeviceService>();
+    deviceService.sendMouseInput('click', screenX, screenY, button: 'right');
+  }
 
+  Offset? _lastTapPosition;
+  
   void _onDoubleTap() {
     if (!_isControlling) return;
     
-    // 双击 = 两次点击
+    // 双击 = 两次点击（使用上次点击位置或屏幕中心）
     final renderBox = context.findRenderObject() as RenderBox;
-    final localPosition = renderBox.globalToLocal(
+    final localPosition = _lastTapPosition ?? renderBox.globalToLocal(
       Offset(MediaQuery.of(context).size.width / 2, 
              MediaQuery.of(context).size.height / 2)
     );

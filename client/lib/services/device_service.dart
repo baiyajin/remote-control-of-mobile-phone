@@ -148,7 +148,13 @@ class DeviceService extends ChangeNotifier {
           break;
         case 'connect_response':
           final responseData = data['data'] as Map<String, dynamic>;
-          _currentSessionId = responseData['session_id'] as String?;
+          final status = responseData['status'] as String?;
+          if (status == 'rejected') {
+            // 连接被拒绝
+            _currentSessionId = null;
+          } else if (status == 'success') {
+            _currentSessionId = responseData['session_id'] as String?;
+          }
           onConnectResponse?.call(responseData);
           break;
         case 'screen_frame':
@@ -176,6 +182,15 @@ class DeviceService extends ChangeNotifier {
         case 'file_delete':
           onFileDeleteReceived?.call(data['data'] as Map<String, dynamic>);
           break;
+        case 'file_rename':
+          onFileRenameReceived?.call(data['data'] as Map<String, dynamic>);
+          break;
+        case 'file_move':
+          onFileMoveReceived?.call(data['data'] as Map<String, dynamic>);
+          break;
+        case 'file_create_directory':
+          onFileCreateDirectoryReceived?.call(data['data'] as Map<String, dynamic>);
+          break;
         case 'terminal_command':
           onTerminalCommandReceived?.call(data['data'] as Map<String, dynamic>);
           break;
@@ -187,6 +202,9 @@ class DeviceService extends ChangeNotifier {
           break;
         case 'app_install_response':
           onAppInstallResponseReceived?.call(data['data'] as Map<String, dynamic>);
+          break;
+        case 'stop_screen_stream':
+          onStopScreenStreamReceived?.call(data['data'] as Map<String, dynamic>);
           break;
         default:
           print('未知消息类型: $type');

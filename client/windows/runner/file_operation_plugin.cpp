@@ -28,8 +28,11 @@ class FileOperationPlugin : public flutter::Plugin {
   flutter::EncodableValue GetFileList(const std::string& path);
   bool UploadFile(const std::string& targetPath, const std::string& fileName, const std::vector<uint8_t>& fileData);
   std::vector<uint8_t> DownloadFile(const std::string& filePath);
-  bool DeleteFile(const std::string& filePath);
-};
+      bool DeleteFile(const std::string& filePath);
+      bool RenameFile(const std::string& oldPath, const std::string& newPath);
+      bool MoveFile(const std::string& sourcePath, const std::string& targetPath);
+      bool CreateDirectory(const std::string& path);
+    };
 
 void FileOperationPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows *registrar) {
@@ -97,6 +100,34 @@ void FileOperationPlugin::HandleMethodCall(
     if (args && args->find(flutter::EncodableValue("filePath")) != args->end()) {
       std::string filePath = std::get<std::string>(args->at(flutter::EncodableValue("filePath")));
       bool success = DeleteFile(filePath);
+      result->Success(flutter::EncodableValue(success));
+    } else {
+      result->Error("INVALID_ARGS", "Invalid arguments");
+    }
+  } else if (method_call.method_name().compare("renameFile") == 0) {
+    if (args && args->find(flutter::EncodableValue("oldPath")) != args->end() &&
+        args->find(flutter::EncodableValue("newPath")) != args->end()) {
+      std::string oldPath = std::get<std::string>(args->at(flutter::EncodableValue("oldPath")));
+      std::string newPath = std::get<std::string>(args->at(flutter::EncodableValue("newPath")));
+      bool success = RenameFile(oldPath, newPath);
+      result->Success(flutter::EncodableValue(success));
+    } else {
+      result->Error("INVALID_ARGS", "Invalid arguments");
+    }
+  } else if (method_call.method_name().compare("moveFile") == 0) {
+    if (args && args->find(flutter::EncodableValue("sourcePath")) != args->end() &&
+        args->find(flutter::EncodableValue("targetPath")) != args->end()) {
+      std::string sourcePath = std::get<std::string>(args->at(flutter::EncodableValue("sourcePath")));
+      std::string targetPath = std::get<std::string>(args->at(flutter::EncodableValue("targetPath")));
+      bool success = MoveFile(sourcePath, targetPath);
+      result->Success(flutter::EncodableValue(success));
+    } else {
+      result->Error("INVALID_ARGS", "Invalid arguments");
+    }
+  } else if (method_call.method_name().compare("createDirectory") == 0) {
+    if (args && args->find(flutter::EncodableValue("path")) != args->end()) {
+      std::string path = std::get<std::string>(args->at(flutter::EncodableValue("path")));
+      bool success = CreateDirectory(path);
       result->Success(flutter::EncodableValue(success));
     } else {
       result->Error("INVALID_ARGS", "Invalid arguments");
@@ -185,6 +216,42 @@ bool FileOperationPlugin::DeleteFile(const std::string& filePath) {
       } else {
         fs::remove(filePath);
       }
+      return true;
+    }
+  } catch (const std::exception& e) {
+    return false;
+  }
+  return false;
+}
+
+bool FileOperationPlugin::RenameFile(const std::string& oldPath, const std::string& newPath) {
+  try {
+    if (fs::exists(oldPath)) {
+      fs::rename(oldPath, newPath);
+      return true;
+    }
+  } catch (const std::exception& e) {
+    return false;
+  }
+  return false;
+}
+
+bool FileOperationPlugin::MoveFile(const std::string& sourcePath, const std::string& targetPath) {
+  try {
+    if (fs::exists(sourcePath)) {
+      fs::rename(sourcePath, targetPath);
+      return true;
+    }
+  } catch (const std::exception& e) {
+    return false;
+  }
+  return false;
+}
+
+bool FileOperationPlugin::CreateDirectory(const std::string& path) {
+  try {
+    if (!fs::exists(path)) {
+      fs::create_directories(path);
       return true;
     }
   } catch (const std::exception& e) {

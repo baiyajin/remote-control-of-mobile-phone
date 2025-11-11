@@ -67,5 +67,46 @@ class FileOperationService {
       return false;
     }
   }
+
+  // 重命名文件
+  Future<bool> renameFile(String oldPath, String newPath) async {
+    try {
+      final result = await _channel.invokeMethod<bool>('renameFile', {
+        'oldPath': oldPath,
+        'newPath': newPath,
+      });
+      return result ?? false;
+    } catch (e) {
+      debugPrint('重命名文件失败: $e');
+      return false;
+    }
+  }
+
+  // 移动文件
+  Future<bool> moveFile(String sourcePath, String targetPath) async {
+    try {
+      final result = await _channel.invokeMethod<bool>('moveFile', {
+        'sourcePath': sourcePath,
+        'targetPath': targetPath,
+      });
+      return result ?? false;
+    } catch (e) {
+      debugPrint('移动文件失败: $e');
+      return false;
+    }
+  }
+
+  // 创建文件夹
+  Future<bool> createDirectory(String path) async {
+    try {
+      final result = await _channel.invokeMethod<bool>('createDirectory', {
+        'path': path,
+      });
+      return result ?? false;
+    } catch (e) {
+      debugPrint('创建文件夹失败: $e');
+      return false;
+    }
+  }
 }
 
