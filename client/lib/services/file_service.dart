@@ -10,7 +10,6 @@ class FileService {
   // 获取文件列表（带响应等待）
   Future<List<FileInfo>> getFileList(String path) async {
     final completer = Completer<List<FileInfo>>();
-    final requestId = DateTime.now().millisecondsSinceEpoch.toString();
     
     // 设置响应回调
     _deviceService.onFileListReceived = (data) {
@@ -46,7 +45,6 @@ class FileService {
   // 上传文件（带响应等待）
   Future<bool> uploadFile(String targetPath, String fileName, List<int> fileData) async {
     final completer = Completer<bool>();
-    final requestId = DateTime.now().millisecondsSinceEpoch.toString();
     
     // 设置响应回调
     _deviceService.onFileUploadResponseReceived = (data) {

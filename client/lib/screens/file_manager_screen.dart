@@ -251,16 +251,23 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
         Navigator.pop(context); // 关闭进度对话框
         
         if (fileData != null) {
-          // 保存文件
+          // 保存文件 - file_picker 的 saveFile 只返回路径，需要手动写入
           final result = await FilePicker.platform.saveFile(
             fileName: file.name,
-            bytes: Uint8List.fromList(fileData),
           );
           
           if (result != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('文件下载成功')),
-            );
+            try {
+              final saveFile = File(result);
+              await saveFile.writeAsBytes(fileData);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('文件下载成功')),
+              );
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('文件保存失败: $e')),
+              );
+            }
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('文件保存已取消')),

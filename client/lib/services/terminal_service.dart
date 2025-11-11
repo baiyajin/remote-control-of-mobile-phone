@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'device_service.dart';
 
 class TerminalService {
