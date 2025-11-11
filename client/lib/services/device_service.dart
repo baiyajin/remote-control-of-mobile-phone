@@ -98,6 +98,11 @@ class DeviceService extends ChangeNotifier {
     _channel?.sink.add(jsonEncode(message));
   }
 
+  // 屏幕帧接收回调
+  Function(Map<String, dynamic>)? onScreenFrameReceived;
+  // 连接响应回调
+  Function(Map<String, dynamic>)? onConnectResponse;
+
   void _handleMessage(dynamic message) {
     try {
       final data = jsonDecode(message.toString());
@@ -111,6 +116,12 @@ class DeviceService extends ChangeNotifier {
           print('设备注册成功');
           // 注册成功后请求设备列表
           requestDeviceList();
+          break;
+        case 'connect_response':
+          onConnectResponse?.call(data['data'] as Map<String, dynamic>);
+          break;
+        case 'screen_frame':
+          onScreenFrameReceived?.call(data['data'] as Map<String, dynamic>);
           break;
         default:
           print('未知消息类型: $type');
@@ -136,6 +147,41 @@ class DeviceService extends ChangeNotifier {
       'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
       'data': {
         'device_id': deviceId,
+      },
+    };
+
+    _channel?.sink.add(jsonEncode(message));
+  }
+
+  // 发送输入控制消息
+  void sendMouseInput(String action, double x, double y, {String? button, int? delta}) {
+    if (!_connected) return;
+
+    final message = {
+      'type': 'input_mouse',
+      'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'data': {
+        'action': action,
+        'x': x,
+        'y': y,
+        if (button != null) 'button': button,
+        if (delta != null) 'delta': delta,
+      },
+    };
+
+    _channel?.sink.add(jsonEncode(message));
+  }
+
+  void sendKeyboardInput(String action, String key, {List<String>? modifiers}) {
+    if (!_connected) return;
+
+    final message = {
+      'type': 'input_keyboard',
+      'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'data': {
+        'action': action,
+        'key': key,
+        if (modifiers != null) 'modifiers': modifiers,
       },
     };
 

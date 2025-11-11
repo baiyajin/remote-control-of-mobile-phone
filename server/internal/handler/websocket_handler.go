@@ -81,7 +81,13 @@ func (h *WebSocketHandler) handleMessage(msg *protocol.Message, conn *websocket.
 	case "device_list":
 		return h.handleDeviceList()
 	case "connect_request":
-		return h.handleConnectRequest(msg)
+		return h.handleConnectRequest(msg, conn, *deviceID)
+	case "screen_frame":
+		h.handleScreenFrame(msg, *deviceID)
+		return nil // 屏幕帧不需要响应
+	case "input_mouse", "input_keyboard":
+		h.handleInputControl(msg, *deviceID)
+		return nil // 输入控制不需要响应
 	case "ping":
 		return h.handlePing()
 	default:
@@ -162,14 +168,14 @@ func (h *WebSocketHandler) handleDeviceList() *protocol.Message {
 	})
 }
 
-func (h *WebSocketHandler) handleConnectRequest(msg *protocol.Message) *protocol.Message {
+func (h *WebSocketHandler) handleConnectRequest(msg *protocol.Message, conn *websocket.Conn, controllerID string) *protocol.Message {
 	var data protocol.ConnectRequestData
 	if err := json.Unmarshal(msg.Data, &data); err != nil {
 		return h.errorResponse("解析连接请求失败")
 	}
 
 	// 检查目标设备是否在线
-	conn, ok := h.connectionService.GetConnection(data.DeviceID)
+	controlledConn, ok := h.connectionService.GetConnection(data.DeviceID)
 	if !ok {
 		return h.successResponse("connect_response", protocol.ConnectResponseData{
 			Status:  "failed",
@@ -180,15 +186,63 @@ func (h *WebSocketHandler) handleConnectRequest(msg *protocol.Message) *protocol
 	// 生成会话ID
 	sessionID := generateSessionID()
 
-	log.Printf("连接请求: %s -> %s (会话: %s)", "unknown", data.DeviceID, sessionID)
+	// 创建会话
+	h.connectionService.CreateSession(sessionID, controllerID, data.DeviceID)
 
-	// 转发连接请求到目标设备（这里简化处理，实际应该通过目标设备的连接发送）
-	_ = conn
+	log.Printf("连接请求: %s -> %s (会话: %s)", controllerID, data.DeviceID, sessionID)
+
+	// 通知被控端有连接请求
+	notificationMsg := h.successResponse("notification", protocol.NotificationData{
+		Title:   "连接请求",
+		Message: "有设备想要连接您的设备",
+		Action:  "accept",
+	})
+	if wsConn, ok := controlledConn.Conn.(*websocket.Conn); ok {
+		wsConn.WriteJSON(notificationMsg)
+	}
 
 	return h.successResponse("connect_response", protocol.ConnectResponseData{
 		Status:    "success",
 		SessionID: sessionID,
 	})
+}
+
+// 处理屏幕帧（从被控端转发到控制端）
+func (h *WebSocketHandler) handleScreenFrame(msg *protocol.Message, controlledID string) {
+	// 找到控制端
+	controllerID := h.connectionService.GetControllerID(controlledID)
+	if controllerID == "" {
+		return
+	}
+
+	// 转发屏幕帧到控制端
+	controllerConn, ok := h.connectionService.GetConnection(controllerID)
+	if !ok {
+		return
+	}
+
+	if wsConn, ok := controllerConn.Conn.(*websocket.Conn); ok {
+		wsConn.WriteJSON(msg)
+	}
+}
+
+// 处理输入控制（从控制端转发到被控端）
+func (h *WebSocketHandler) handleInputControl(msg *protocol.Message, controllerID string) {
+	// 找到被控端
+	controlledID := h.connectionService.GetControlledID(controllerID)
+	if controlledID == "" {
+		return
+	}
+
+	// 转发输入控制到被控端
+	controlledConn, ok := h.connectionService.GetConnection(controlledID)
+	if !ok {
+		return
+	}
+
+	if wsConn, ok := controlledConn.Conn.(*websocket.Conn); ok {
+		wsConn.WriteJSON(msg)
+	}
 }
 
 func (h *WebSocketHandler) handlePing() *protocol.Message {
