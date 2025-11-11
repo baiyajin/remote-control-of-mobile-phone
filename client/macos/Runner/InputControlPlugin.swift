@@ -73,9 +73,15 @@ public class InputControlPlugin: NSObject, FlutterPlugin {
   
   private func typeText(text: String) {
     // 使用 CGEvent 输入文本
-    let event = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true)
-    event?.keyboardSetUnicodeString(stringLength: text.count, unicodeString: text)
-    event?.post(tap: .cghidEventTap)
+    for char in text {
+      let keyCode = getKeyCode(key: String(char))
+      if keyCode != 0 {
+        let downEvent = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: true)
+        let upEvent = CGEvent(keyboardEventSource: nil, virtualKey: keyCode, keyDown: false)
+        downEvent?.post(tap: .cghidEventTap)
+        upEvent?.post(tap: .cghidEventTap)
+      }
+    }
   }
   
   private func getKeyCode(key: String) -> CGKeyCode {

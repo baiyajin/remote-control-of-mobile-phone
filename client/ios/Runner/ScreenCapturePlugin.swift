@@ -1,6 +1,8 @@
 import Flutter
 import UIKit
 import ReplayKit
+import CoreMedia
+import CoreVideo
 
 public class ScreenCapturePlugin: NSObject, FlutterPlugin {
   private var rpScreenRecorder: RPScreenRecorder?

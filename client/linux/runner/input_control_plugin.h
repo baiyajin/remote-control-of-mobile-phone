@@ -6,6 +6,8 @@
 #include <X11/keysym.h>
 #include <string>
 
+typedef unsigned char KeyCode;
+
 void RegisterInputControlPlugin(flutter::PluginRegistrarLinux *registrar);
 
 #endif  // RUNNER_INPUT_CONTROL_PLUGIN_H_
