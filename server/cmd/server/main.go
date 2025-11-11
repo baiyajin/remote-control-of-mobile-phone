@@ -23,10 +23,11 @@ func main() {
 	// 初始化服务
 	deviceService := service.NewDeviceService(db)
 	connectionService := service.NewConnectionService()
+	logService := service.NewLogService(1000)
 
 	// 初始化处理器
 	wsHandler := handler.NewWebSocketHandler(deviceService, connectionService)
-	httpHandler := handler.NewHTTPHandler(deviceService, connectionService)
+	httpHandler := handler.NewHTTPHandler(deviceService, connectionService, logService)
 
 	// 设置路由
 	router := gin.Default()
