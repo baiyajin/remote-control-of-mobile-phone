@@ -129,7 +129,58 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
 
   void _onDoubleTap() {
     if (!_isControlling) return;
-    // 双击处理
+    
+    // 双击 = 两次点击
+    final renderBox = context.findRenderObject() as RenderBox;
+    final localPosition = renderBox.globalToLocal(
+      Offset(MediaQuery.of(context).size.width / 2, 
+             MediaQuery.of(context).size.height / 2)
+    );
+    
+    final screenWidth = _currentImage?.width ?? 1920;
+    final screenHeight = _currentImage?.height ?? 1080;
+    final displayWidth = MediaQuery.of(context).size.width;
+    final displayHeight = MediaQuery.of(context).size.height - 100;
+    
+    final scaleX = screenWidth / displayWidth;
+    final scaleY = screenHeight / displayHeight;
+    
+    final screenX = localPosition.dx * scaleX;
+    final screenY = localPosition.dy * scaleY;
+    
+    final deviceService = context.read<DeviceService>();
+    // 发送两次点击
+    deviceService.sendMouseInput('click', screenX, screenY, button: 'left');
+    Future.delayed(const Duration(milliseconds: 100), () {
+      deviceService.sendMouseInput('click', screenX, screenY, button: 'left');
+    });
+  }
+  
+  void _onScaleUpdate(ScaleUpdateDetails details) {
+    if (!_isControlling) return;
+    
+    // 处理滚轮事件（通过缩放手势）
+    if (details.scale != 1.0) {
+      final renderBox = context.findRenderObject() as RenderBox;
+      final localPosition = renderBox.globalToLocal(details.localFocalPoint);
+      
+      final screenWidth = _currentImage?.width ?? 1920;
+      final screenHeight = _currentImage?.height ?? 1080;
+      final displayWidth = MediaQuery.of(context).size.width;
+      final displayHeight = MediaQuery.of(context).size.height - 100;
+      
+      final scaleX = screenWidth / displayWidth;
+      final scaleY = screenHeight / displayHeight;
+      
+      final screenX = localPosition.dx * scaleX;
+      final screenY = localPosition.dy * scaleY;
+      
+      // 计算滚轮增量（缩放变化转换为滚轮）
+      final delta = (details.scale - 1.0) * 120;
+      
+      final deviceService = context.read<DeviceService>();
+      deviceService.sendMouseInput('scroll', screenX, screenY, delta: delta.toInt());
+    }
   }
 
   @override
@@ -156,7 +207,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
           ),
         ],
       ),
-      body: _currentImage == null
+          body: _currentImage == null
           ? const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -171,6 +222,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
               onPanUpdate: _onPanUpdate,
               onTapDown: _onTapDown,
               onDoubleTap: _onDoubleTap,
+              onScaleUpdate: _onScaleUpdate,
               child: Center(
                 child: CustomPaint(
                   painter: ScreenPainter(_currentImage!),

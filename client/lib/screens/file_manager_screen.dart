@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -130,14 +131,30 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
                               }
                             },
                             trailing: file.type == 'file'
-                                ? IconButton(
-                                    icon: const Icon(Icons.download),
-                                    onPressed: () {
-                                      // 下载文件
-                                      _fileService.downloadFile(file.path);
-                                    },
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.download),
+                                        onPressed: () => _downloadFile(file),
+                                        tooltip: '下载',
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete),
+                                        onPressed: () => _deleteFile(file),
+                                        tooltip: '删除',
+                                        color: Colors.red,
+                                      ),
+                                    ],
                                   )
-                                : null,
+                                : file.type == 'directory'
+                                    ? IconButton(
+                                        icon: const Icon(Icons.delete),
+                                        onPressed: () => _deleteFile(file),
+                                        tooltip: '删除',
+                                        color: Colors.red,
+                                      )
+                                    : null,
                           );
                         },
                       ),
@@ -203,6 +220,107 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
           Navigator.pop(context); // 关闭进度对话框
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('文件上传失败: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _downloadFile(FileInfo file) async {
+    try {
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text('正在下载: ${file.name}'),
+              ],
+            ),
+          ),
+        );
+      }
+
+      final fileData = await _fileService.downloadFile(file.path);
+      
+      if (mounted) {
+        Navigator.pop(context); // 关闭进度对话框
+        
+        if (fileData != null) {
+          // 保存文件
+          final result = await FilePicker.platform.saveFile(
+            fileName: file.name,
+            bytes: Uint8List.fromList(fileData),
+          );
+          
+          if (result != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('文件下载成功')),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('文件保存已取消')),
+            );
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('文件下载失败')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // 关闭进度对话框
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('文件下载失败: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteFile(FileInfo file) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: Text('确定要删除 "${file.name}" 吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final success = await _fileService.deleteFile(file.path);
+        if (mounted) {
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('文件删除成功')),
+            );
+            // 刷新文件列表
+            _loadFiles(_currentPath);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('文件删除失败')),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('文件删除失败: $e')),
           );
         }
       }

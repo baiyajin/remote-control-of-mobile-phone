@@ -45,24 +45,25 @@ class DeviceService extends ChangeNotifier {
         onDone: () {
           print('WebSocket 连接关闭');
           _connected = false;
+          _currentSessionId = null;
           notifyListeners();
+          // 自动重连（仅在非手动断开时）
+          if (_channel != null) {
+            _autoReconnect();
+          }
         },
       );
 
       // 注册当前设备
       await registerDevice();
+      _reconnectAttempts = 0; // 重置重连计数
     } catch (e) {
       print('连接失败: $e');
       _connected = false;
       notifyListeners();
+      // 连接失败也尝试重连
+      _autoReconnect();
     }
-  }
-
-  void disconnect() {
-    _channel?.sink.close();
-    _channel = null;
-    _connected = false;
-    notifyListeners();
   }
 
   Future<void> registerDevice() async {
@@ -121,6 +122,14 @@ class DeviceService extends ChangeNotifier {
   Function(Map<String, dynamic>)? onTerminalCommandReceived;
   // 文件上传响应接收回调
   Function(Map<String, dynamic>)? onFileUploadResponseReceived;
+  // 文件删除响应接收回调
+  Function(Map<String, dynamic>)? onFileDeleteResponseReceived;
+  // 应用安装响应接收回调
+  Function(Map<String, dynamic>)? onAppInstallResponseReceived;
+  
+  // 当前会话ID
+  String? _currentSessionId;
+  String? get currentSessionId => _currentSessionId;
 
   void _handleMessage(dynamic message) {
     try {
@@ -137,7 +146,9 @@ class DeviceService extends ChangeNotifier {
           requestDeviceList();
           break;
         case 'connect_response':
-          onConnectResponse?.call(data['data'] as Map<String, dynamic>);
+          final responseData = data['data'] as Map<String, dynamic>;
+          _currentSessionId = responseData['session_id'] as String?;
+          onConnectResponse?.call(responseData);
           break;
         case 'screen_frame':
           onScreenFrameReceived?.call(data['data'] as Map<String, dynamic>);
@@ -169,6 +180,12 @@ class DeviceService extends ChangeNotifier {
           break;
         case 'file_upload_response':
           onFileUploadResponseReceived?.call(data['data'] as Map<String, dynamic>);
+          break;
+        case 'file_delete_response':
+          onFileDeleteResponseReceived?.call(data['data'] as Map<String, dynamic>);
+          break;
+        case 'app_install_response':
+          onAppInstallResponseReceived?.call(data['data'] as Map<String, dynamic>);
           break;
         default:
           print('未知消息类型: $type');
@@ -207,6 +224,7 @@ class DeviceService extends ChangeNotifier {
     final message = {
       'type': 'input_mouse',
       'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      if (_currentSessionId != null) 'session_id': _currentSessionId,
       'data': {
         'action': action,
         'x': x,
@@ -225,6 +243,7 @@ class DeviceService extends ChangeNotifier {
     final message = {
       'type': 'input_keyboard',
       'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      if (_currentSessionId != null) 'session_id': _currentSessionId,
       'data': {
         'action': action,
         'key': key,
@@ -233,6 +252,65 @@ class DeviceService extends ChangeNotifier {
     };
 
     _channel?.sink.add(jsonEncode(message));
+  }
+  
+  // 发送文件操作消息（带 SessionID）
+  void sendFileOperation(String type, Map<String, dynamic> data) {
+    if (!_connected) return;
+    
+    final message = {
+      'type': type,
+      'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      if (_currentSessionId != null) 'session_id': _currentSessionId,
+      'data': data,
+    };
+    
+    _channel?.sink.add(jsonEncode(message));
+  }
+  
+  // 发送终端命令（带 SessionID）
+  void sendTerminalCommand(String command, {String? workingDir}) {
+    if (!_connected) return;
+    
+    final message = {
+      'type': 'terminal_command',
+      'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      if (_currentSessionId != null) 'session_id': _currentSessionId,
+      'data': {
+        'command': command,
+        if (workingDir != null) 'working_dir': workingDir,
+      },
+    };
+    
+    _channel?.sink.add(jsonEncode(message));
+  }
+
+  Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 5;
+  static const Duration _reconnectDelay = Duration(seconds: 3);
+
+  void _autoReconnect() {
+    if (_reconnectAttempts >= _maxReconnectAttempts) {
+      print('达到最大重连次数，停止重连');
+      return;
+    }
+    
+    _reconnectAttempts++;
+    _reconnectTimer = Timer(_reconnectDelay, () {
+      print('尝试重连 ($_reconnectAttempts/$_maxReconnectAttempts)...');
+      connect();
+    });
+  }
+
+  void disconnect() {
+    _reconnectTimer?.cancel();
+    _reconnectAttempts = 0;
+    _channel?.sink.close();
+    _channel = null;
+    _connected = false;
+    _currentSessionId = null;
+    notifyListeners();
   }
 
   String _getPlatformType() {

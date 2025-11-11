@@ -29,15 +29,9 @@ class FileService {
       }
     };
     
-    final message = {
-      'type': 'file_list',
-      'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      'data': {
-        'path': path,
-      },
-    };
-
-    _deviceService.channel?.sink.add(jsonEncode(message));
+    _deviceService.sendFileOperation('file_list', {
+      'path': path,
+    });
     
     // 等待响应（超时5秒）
     return completer.future.timeout(
@@ -64,17 +58,11 @@ class FileService {
       }
     };
     
-    final message = {
-      'type': 'file_upload',
-      'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      'data': {
-        'path': targetPath,
-        'file_name': fileName,
-        'file_data': base64Encode(fileData),
-      },
-    };
-
-    _deviceService.channel?.sink.add(jsonEncode(message));
+    _deviceService.sendFileOperation('file_upload', {
+      'path': targetPath,
+      'file_name': fileName,
+      'file_data': base64Encode(fileData),
+    });
     
     // 等待响应（超时30秒）
     return completer.future.timeout(
@@ -104,15 +92,9 @@ class FileService {
       }
     };
     
-    final message = {
-      'type': 'file_download',
-      'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      'data': {
-        'path': filePath,
-      },
-    };
-
-    _deviceService.channel?.sink.add(jsonEncode(message));
+    _deviceService.sendFileOperation('file_download', {
+      'path': filePath,
+    });
     
     // 等待响应（超时30秒）
     return completer.future.timeout(
@@ -124,17 +106,32 @@ class FileService {
     );
   }
 
-  // 删除文件
-  Future<void> deleteFile(String filePath) async {
-    final message = {
-      'type': 'file_delete',
-      'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      'data': {
-        'path': filePath,
-      },
+  // 删除文件（带响应等待）
+  Future<bool> deleteFile(String filePath) async {
+    final completer = Completer<bool>();
+    
+    // 设置响应回调
+    _deviceService.onFileDeleteResponseReceived = (data) {
+      final responsePath = data['path'] as String?;
+      if (responsePath == filePath) {
+        final success = data['success'] as bool? ?? false;
+        completer.complete(success);
+        _deviceService.onFileDeleteResponseReceived = null; // 清除回调
+      }
     };
-
-    _deviceService.channel?.sink.add(jsonEncode(message));
+    
+    _deviceService.sendFileOperation('file_delete', {
+      'path': filePath,
+    });
+    
+    // 等待响应（超时10秒）
+    return completer.future.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        _deviceService.onFileDeleteResponseReceived = null;
+        return false;
+      },
+    );
   }
 }
 

@@ -10,16 +10,7 @@ class TerminalService {
 
   // 执行命令
   Future<void> executeCommand(String command, {String? workingDir}) async {
-    final message = {
-      'type': 'terminal_command',
-      'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      'data': {
-        'command': command,
-        if (workingDir != null) 'working_dir': workingDir,
-      },
-    };
-
-    _deviceService.channel?.sink.add(jsonEncode(message));
+    _deviceService.sendTerminalCommand(command, workingDir: workingDir);
   }
 
   // 处理终端输出
