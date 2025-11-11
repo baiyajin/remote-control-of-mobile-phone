@@ -7,6 +7,10 @@ import 'services/screen_stream_service.dart';
 import 'services/input_control_service.dart';
 import 'services/file_operation_service.dart';
 import 'services/terminal_execution_service.dart';
+import 'widgets/notification_dialog.dart';
+
+// 全局 navigator key，用于在非 widget 上下文中显示对话框
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   runApp(const MyApp());
@@ -27,14 +31,35 @@ class MyApp extends StatelessWidget {
             final fileOperationService = FileOperationService();
             final terminalExecutionService = TerminalExecutionService();
             
-            // 设置被控端逻辑（当收到连接请求时开始发送屏幕帧）
+            // 设置被控端逻辑（当收到连接请求时显示通知对话框）
             deviceService.onNotificationReceived = (data) async {
+              final title = data['title'] as String? ?? '通知';
+              final message = data['message'] as String? ?? '';
               final action = data['action'] as String?;
-              if (action == 'accept') {
-                // 开始发送屏幕帧
-                final channel = deviceService.channel;
-                if (channel != null) {
-                  await screenStreamService.startSendingScreen(channel);
+              
+              // 使用全局 navigator key 显示通知对话框
+              if (navigatorKey.currentContext != null) {
+                final accepted = await NotificationDialog.show(
+                  navigatorKey.currentContext!,
+                  title: title,
+                  message: message,
+                  action: action,
+                );
+                
+                if (accepted == true) {
+                  // 用户接受连接，开始发送屏幕帧
+                  final channel = deviceService.channel;
+                  if (channel != null) {
+                    await screenStreamService.startSendingScreen(channel);
+                  }
+                }
+              } else {
+                // 如果 context 不可用，自动接受（简化处理）
+                if (action == 'accept') {
+                  final channel = deviceService.channel;
+                  if (channel != null) {
+                    await screenStreamService.startSendingScreen(channel);
+                  }
                 }
               }
             };
@@ -174,6 +199,7 @@ class MyApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
+        navigatorKey: navigatorKey,
         title: '远程控制',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
