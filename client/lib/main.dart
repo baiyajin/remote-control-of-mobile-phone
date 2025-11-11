@@ -36,6 +36,8 @@ class MyApp extends StatelessWidget {
               final title = data['title'] as String? ?? '通知';
               final message = data['message'] as String? ?? '';
               final action = data['action'] as String?;
+              // 从 DeviceService 获取 sessionID（在收到通知时已保存）
+              final sessionId = deviceService.currentSessionId;
               
               // 使用全局 navigator key 显示通知对话框
               if (navigatorKey.currentContext != null) {
@@ -52,18 +54,17 @@ class MyApp extends StatelessWidget {
                   if (channel != null) {
                     await screenStreamService.startSendingScreen(channel);
                   }
-                } else if (accepted == false) {
+                } else if (accepted == false && sessionId != null) {
                   // 用户拒绝连接，通知服务器
-                  // 需要从通知数据中获取 sessionID（这里简化处理，实际应该从通知中获取）
-                  final message = {
+                  final rejectMessage = {
                     'type': 'connect_reject',
                     'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
                     'data': {
-                      'session_id': '', // 需要从通知中获取
+                      'session_id': sessionId,
                       'reason': '用户拒绝连接',
                     },
                   };
-                  deviceService.channel?.sink.add(jsonEncode(message));
+                  deviceService.channel?.sink.add(jsonEncode(rejectMessage));
                 }
               } else {
                 // 如果 context 不可用，自动接受（简化处理）

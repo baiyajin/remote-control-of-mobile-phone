@@ -18,6 +18,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
   final TextEditingController _commandController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<String> _outputLines = [];
+  final List<String> _commandHistory = [];
+  int _historyIndex = -1;
   String _currentDir = 'C:\\';
 
   @override
@@ -72,6 +74,15 @@ class _TerminalScreenState extends State<TerminalScreen> {
     final command = _commandController.text.trim();
     if (command.isEmpty) return;
 
+    // 添加到历史记录
+    if (_commandHistory.isEmpty || _commandHistory.last != command) {
+      _commandHistory.add(command);
+      if (_commandHistory.length > 100) {
+        _commandHistory.removeAt(0);
+      }
+    }
+    _historyIndex = _commandHistory.length;
+
     setState(() {
       _outputLines.add('$_currentDir> $command');
     });
@@ -79,6 +90,17 @@ class _TerminalScreenState extends State<TerminalScreen> {
     _scrollToBottom();
 
     _terminalService.executeCommand(command, workingDir: _currentDir);
+  }
+  
+  void _navigateHistory(int direction) {
+    if (_commandHistory.isEmpty) return;
+    
+    setState(() {
+      _historyIndex = (_historyIndex + direction).clamp(0, _commandHistory.length);
+      if (_historyIndex < _commandHistory.length) {
+        _commandController.text = _commandHistory[_historyIndex];
+      }
+    });
   }
 
   @override
@@ -131,10 +153,23 @@ class _TerminalScreenState extends State<TerminalScreen> {
                     style: const TextStyle(fontFamily: 'Courier'),
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
-                      hintText: '输入命令...',
+                      hintText: '输入命令... (↑↓ 浏览历史)',
                     ),
                     onSubmitted: (_) => _executeCommand(),
+                    onTap: () {
+                      _historyIndex = _commandHistory.length;
+                    },
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_upward),
+                  onPressed: () => _navigateHistory(-1),
+                  tooltip: '上一条命令',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_downward),
+                  onPressed: () => _navigateHistory(1),
+                  tooltip: '下一条命令',
                 ),
                 IconButton(
                   icon: const Icon(Icons.send),
