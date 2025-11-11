@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>远程控制 - Web控制端</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            margin-bottom: 15px;
+        }
+
+        .connection-form {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .connection-form input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .connection-form button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .connection-form button:hover {
+            background: #0056b3;
+        }
+
+        .connection-form button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .device-list {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .device-item {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .device-item:hover {
+            background: #f8f9fa;
+        }
+
+        .device-info {
+            flex: 1;
+        }
+
+        .device-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .device-details {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .device-actions button {
+            padding: 8px 16px;
+            margin-left: 10px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .device-actions button:hover {
+            background: #218838;
+        }
+
+        .control-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .screen-container {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .screen-display {
+            width: 100%;
+            height: auto;
+            display: block;
+            cursor: crosshair;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .control-buttons button {
+            padding: 10px 20px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .control-buttons button:hover {
+            background: #5a6268;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>远程控制 - Web控制端</h1>
+            <div class="connection-form">
+                <input type="text" id="serverUrl" placeholder="服务器地址 (例如: ws://localhost:8080)" value="ws://localhost:8080">
+                <button id="connectBtn" onclick="connect()">连接</button>
+                <button id="disconnectBtn" onclick="disconnect()" disabled>断开</button>
+            </div>
+            <div id="status" class="status disconnected">未连接</div>
+        </div>
+
+        <div id="deviceList" class="device-list hidden">
+            <h2>设备列表</h2>
+            <div id="devices"></div>
+        </div>
+
+        <div id="controlPanel" class="control-panel hidden">
+            <h2>远程控制</h2>
+            <div class="screen-container">
+                <canvas id="screenCanvas" class="screen-display"></canvas>
+            </div>
+            <div class="control-buttons">
+                <button onclick="showKeyboardDialog()">键盘输入</button>
+                <button onclick="showFileManager()">文件管理</button>
+                <button onclick="showTerminal()">终端</button>
+                <button onclick="disconnectControl()">断开控制</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let currentDeviceId = null;
+        let sessionId = null;
+        let canvas = null;
+        let ctx = null;
+        let screenScale = 1;
+
+        function connect() {
+            const url = document.getElementById('serverUrl').value;
+            if (!url) {
+                alert('请输入服务器地址');
+                return;
+            }
+
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                updateStatus('已连接', true);
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                
+                // 注册设备（作为控制端）
+                registerDevice();
+                
+                // 请求设备列表
+                requestDeviceList();
+            };
+
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                handleMessage(message);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket错误:', error);
+                updateStatus('连接错误', false);
+            };
+
+            ws.onclose = () => {
+                updateStatus('已断开', false);
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+                document.getElementById('deviceList').classList.add('hidden');
+                document.getElementById('controlPanel').classList.add('hidden');
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function updateStatus(text, connected) {
+            const status = document.getElementById('status');
+            status.textContent = text;
+            status.className = 'status ' + (connected ? 'connected' : 'disconnected');
+        }
+
+        function registerDevice() {
+            const deviceId = 'web-' + Date.now();
+            const message = {
+                type: 'device_register',
+                timestamp: Math.floor(Date.now() / 1000),
+                data: {
+                    device_id: deviceId,
+                    device_name: 'Web控制端',
+                    device_type: 'web',
+                    ip_address: window.location.hostname,
+                    capabilities: ['control', 'file_management', 'terminal']
+                }
+            };
+            ws.send(JSON.stringify(message));
+        }
+
+        function requestDeviceList() {
+            const message = {
+                type: 'device_list',
+                timestamp: Math.floor(Date.now() / 1000),
+                data: {}
+            };
+            ws.send(JSON.stringify(message));
+        }
+
+        function handleMessage(message) {
+            switch (message.type) {
+                case 'device_list':
+                    displayDevices(message.data.devices || []);
+                    break;
+                case 'connect_response':
+                    if (message.data.status === 'success') {
+                        sessionId = message.data.session_id;
+                        startControl();
+                    } else {
+                        alert('连接失败: ' + (message.data.message || '未知错误'));
+                    }
+                    break;
+                case 'screen_frame':
+                    displayScreenFrame(message.data);
+                    break;
+                case 'terminal_output':
+                    // 终端输出处理
+                    break;
+                case 'file_list':
+                    // 文件列表处理
+                    break;
+            }
+        }
+
+        function displayDevices(devices) {
+            const container = document.getElementById('devices');
+            container.innerHTML = '';
+
+            if (devices.length === 0) {
+                container.innerHTML = '<p>没有可用设备</p>';
+                return;
+            }
+
+            devices.forEach(device => {
+                if (device.online && device.type !== 'web') {
+                    const item = document.createElement('div');
+                    item.className = 'device-item';
+                    item.innerHTML = `
+                        <div class="device-info">
+                            <div class="device-name">${device.name}</div>
+                            <div class="device-details">
+                                ${device.type} | ${device.ip_address}
+                            </div>
+                        </div>
+                        <div class="device-actions">
+                            <button onclick="connectToDevice('${device.id}')">连接</button>
+                        </div>
+                    `;
+                    container.appendChild(item);
+                }
+            });
+
+            document.getElementById('deviceList').classList.remove('hidden');
+        }
+
+        function connectToDevice(deviceId) {
+            currentDeviceId = deviceId;
+            const message = {
+                type: 'connect_request',
+                timestamp: Math.floor(Date.now() / 1000),
+                data: {
+                    device_id: deviceId
+                }
+            };
+            ws.send(JSON.stringify(message));
+        }
+
+        function startControl() {
+            document.getElementById('deviceList').classList.add('hidden');
+            document.getElementById('controlPanel').classList.remove('hidden');
+            
+            canvas = document.getElementById('screenCanvas');
+            ctx = canvas.getContext('2d');
+            
+            // 设置画布事件
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('click', handleMouseClick);
+            canvas.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                handleMouseClick(e, 'right');
+            });
+        }
+
+        function displayScreenFrame(data) {
+            if (!canvas || !ctx) return;
+
+            const img = new Image();
+            img.onload = () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                
+                // 计算缩放比例
+                const container = canvas.parentElement;
+                const scaleX = container.clientWidth / img.width;
+                const scaleY = container.clientHeight / img.height;
+                screenScale = Math.min(scaleX, scaleY, 1);
+            };
+            img.src = 'data:image/png;base64,' + data.frame_data;
+        }
+
+        function handleMouseMove(e) {
+            if (!currentDeviceId || !sessionId) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / screenScale;
+            const y = (e.clientY - rect.top) / screenScale;
+
+            const message = {
+                type: 'input_mouse',
+                timestamp: Math.floor(Date.now() / 1000),
+                session_id: sessionId,
+                data: {
+                    action: 'move',
+                    x: x,
+                    y: y
+                }
+            };
+            ws.send(JSON.stringify(message));
+        }
+
+        function handleMouseClick(e, button = 'left') {
+            if (!currentDeviceId || !sessionId) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / screenScale;
+            const y = (e.clientY - rect.top) / screenScale;
+
+            const message = {
+                type: 'input_mouse',
+                timestamp: Math.floor(Date.now() / 1000),
+                session_id: sessionId,
+                data: {
+                    action: 'click',
+                    x: x,
+                    y: y,
+                    button: button
+                }
+            };
+            ws.send(JSON.stringify(message));
+        }
+
+        function showKeyboardDialog() {
+            const text = prompt('输入要发送的文本:');
+            if (text && currentDeviceId && sessionId) {
+                const message = {
+                    type: 'input_keyboard',
+                    timestamp: Math.floor(Date.now() / 1000),
+                    session_id: sessionId,
+                    data: {
+                        action: 'keypress',
+                        key: text
+                    }
+                };
+                ws.send(JSON.stringify(message));
+            }
+        }
+
+        function showFileManager() {
+            alert('文件管理功能待实现');
+        }
+
+        function showTerminal() {
+            alert('终端功能待实现');
+        }
+
+        function disconnectControl() {
+            currentDeviceId = null;
+            sessionId = null;
+            document.getElementById('controlPanel').classList.add('hidden');
+            document.getElementById('deviceList').classList.remove('hidden');
+            requestDeviceList();
+        }
+    </script>
+</body>
+</html>
+
