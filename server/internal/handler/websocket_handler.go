@@ -107,6 +107,12 @@ func (h *WebSocketHandler) handleMessage(msg *protocol.Message, conn *websocket.
 	case "input_mouse", "input_keyboard":
 		h.handleInputControl(msg, *deviceID)
 		return nil // 输入控制不需要响应
+	case "file_list", "file_upload", "file_download", "file_delete":
+		h.handleFileOperation(msg, *deviceID)
+		return nil // 文件操作需要响应，但通过转发处理
+	case "terminal_command":
+		h.handleTerminalCommand(msg, *deviceID)
+		return nil // 终端命令需要响应，但通过转发处理
 	case "ping":
 		return h.handlePing()
 	default:
@@ -260,6 +266,44 @@ func (h *WebSocketHandler) handleInputControl(msg *protocol.Message, controllerI
 	}
 
 	// 转发输入控制到被控端
+	controlledConn, ok := h.connectionService.GetConnection(controlledID)
+	if !ok {
+		return
+	}
+
+	if wsConn, ok := controlledConn.Conn.(*websocket.Conn); ok {
+		wsConn.WriteJSON(msg)
+	}
+}
+
+// 处理文件操作（从控制端转发到被控端）
+func (h *WebSocketHandler) handleFileOperation(msg *protocol.Message, controllerID string) {
+	// 找到被控端
+	controlledID := h.connectionService.GetControlledID(controllerID)
+	if controlledID == "" {
+		return
+	}
+
+	// 转发文件操作到被控端
+	controlledConn, ok := h.connectionService.GetConnection(controlledID)
+	if !ok {
+		return
+	}
+
+	if wsConn, ok := controlledConn.Conn.(*websocket.Conn); ok {
+		wsConn.WriteJSON(msg)
+	}
+}
+
+// 处理终端命令（从控制端转发到被控端）
+func (h *WebSocketHandler) handleTerminalCommand(msg *protocol.Message, controllerID string) {
+	// 找到被控端
+	controlledID := h.connectionService.GetControlledID(controllerID)
+	if controlledID == "" {
+		return
+	}
+
+	// 转发终端命令到被控端
 	controlledConn, ok := h.connectionService.GetConnection(controlledID)
 	if !ok {
 		return
