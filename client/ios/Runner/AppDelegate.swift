@@ -8,6 +8,13 @@ import UIKit
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
+    
+    // 注册自定义插件
+    if let controller = window?.rootViewController as? FlutterViewController {
+      ScreenCapturePlugin.register(with: registrar(forPlugin: "ScreenCapturePlugin")!)
+      InputControlPlugin.register(with: registrar(forPlugin: "InputControlPlugin")!)
+    }
+    
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }
