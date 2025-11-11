@@ -5,6 +5,8 @@
 #include "flutter/generated_plugin_registrant.h"
 #include "screen_capture_plugin.h"
 #include "input_control_plugin.h"
+#include "file_operation_plugin.h"
+#include "terminal_plugin.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -31,6 +33,8 @@ bool FlutterWindow::OnCreate() {
   // 注册自定义插件
   RegisterScreenCapturePlugin(flutter_controller_->engine());
   RegisterInputControlPlugin(flutter_controller_->engine());
+  RegisterFileOperationPlugin(flutter_controller_->engine());
+  RegisterTerminalPlugin(flutter_controller_->engine());
   
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 

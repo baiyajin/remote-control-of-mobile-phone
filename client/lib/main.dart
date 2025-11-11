@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/device_list_screen.dart';
 import 'services/device_service.dart';
 import 'services/screen_stream_service.dart';
 import 'services/input_control_service.dart';
+import 'services/file_operation_service.dart';
+import 'services/terminal_execution_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -21,6 +24,8 @@ class MyApp extends StatelessWidget {
             final deviceService = DeviceService();
             final screenStreamService = ScreenStreamService();
             final inputControlService = InputControlService();
+            final fileOperationService = FileOperationService();
+            final terminalExecutionService = TerminalExecutionService();
             
             // 设置被控端逻辑（当收到连接请求时开始发送屏幕帧）
             deviceService.onNotificationReceived = (data) async {
@@ -65,6 +70,102 @@ class MyApp extends StatelessWidget {
                       .toList();
                   inputControlService.pressKey(key, modifiers: modifiers);
                 }
+              }
+            };
+            
+            // 设置文件操作处理（被控端）
+            deviceService.onFileListReceived = (data) async {
+              final path = data['path'] as String? ?? 'C:\\';
+              final files = await fileOperationService.getFileList(path);
+              
+              // 发送文件列表响应
+              final message = {
+                'type': 'file_list',
+                'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+                'data': {
+                  'path': path,
+                  'files': files.map((f) => f.toJson()).toList(),
+                },
+              };
+              deviceService.channel?.sink.add(jsonEncode(message));
+            };
+            
+            // 处理文件上传
+            deviceService.onFileUploadReceived = (data) async {
+              final targetPath = data['path'] as String? ?? 'C:\\';
+              final fileName = data['file_name'] as String? ?? '';
+              final fileDataBase64 = data['file_data'] as String? ?? '';
+              
+              if (fileDataBase64.isNotEmpty) {
+                final fileData = base64Decode(fileDataBase64);
+                final success = await fileOperationService.uploadFile(targetPath, fileName, fileData);
+                
+                // 发送上传结果
+                final message = {
+                  'type': 'file_upload_response',
+                  'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+                  'data': {
+                    'success': success,
+                    'path': '$targetPath\\$fileName',
+                  },
+                };
+                deviceService.channel?.sink.add(jsonEncode(message));
+              }
+            };
+            
+            // 处理文件下载
+            deviceService.onFileDownloadReceived = (data) async {
+              final filePath = data['path'] as String? ?? '';
+              if (filePath.isNotEmpty) {
+                final fileData = await fileOperationService.downloadFile(filePath);
+                
+                // 发送文件数据
+                final message = {
+                  'type': 'file_download',
+                  'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+                  'data': {
+                    'path': filePath,
+                    'file_data': fileData != null ? base64Encode(fileData) : '',
+                  },
+                };
+                deviceService.channel?.sink.add(jsonEncode(message));
+              }
+            };
+            
+            // 处理文件删除
+            deviceService.onFileDeleteReceived = (data) async {
+              final filePath = data['path'] as String? ?? '';
+              if (filePath.isNotEmpty) {
+                final success = await fileOperationService.deleteFile(filePath);
+                
+                // 发送删除结果
+                final message = {
+                  'type': 'file_delete_response',
+                  'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+                  'data': {
+                    'success': success,
+                    'path': filePath,
+                  },
+                };
+                deviceService.channel?.sink.add(jsonEncode(message));
+              }
+            };
+            
+            // 设置终端命令处理（被控端）
+            deviceService.onTerminalCommandReceived = (data) async {
+              final command = data['command'] as String? ?? '';
+              final workingDir = data['working_dir'] as String?;
+              
+              if (command.isNotEmpty) {
+                final result = await terminalExecutionService.executeCommand(command, workingDir: workingDir);
+                
+                // 发送终端输出
+                final message = {
+                  'type': 'terminal_output',
+                  'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+                  'data': result,
+                };
+                deviceService.channel?.sink.add(jsonEncode(message));
               }
             };
             

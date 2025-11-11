@@ -21,7 +21,6 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
   StreamSubscription? _screenFrameSubscription;
   ui.Image? _currentImage;
   bool _isControlling = false;
-  String? _sessionId;
 
   @override
   void initState() {

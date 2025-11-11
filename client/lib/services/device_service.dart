@@ -109,6 +109,16 @@ class DeviceService extends ChangeNotifier {
   Function(Map<String, dynamic>)? onInputControlReceived;
   // 终端输出接收回调
   Function(Map<String, dynamic>)? onTerminalOutputReceived;
+  // 文件列表接收回调
+  Function(Map<String, dynamic>)? onFileListReceived;
+  // 文件上传接收回调
+  Function(Map<String, dynamic>)? onFileUploadReceived;
+  // 文件下载接收回调
+  Function(Map<String, dynamic>)? onFileDownloadReceived;
+  // 文件删除接收回调
+  Function(Map<String, dynamic>)? onFileDeleteReceived;
+  // 终端命令接收回调
+  Function(Map<String, dynamic>)? onTerminalCommandReceived;
 
   void _handleMessage(dynamic message) {
     try {
@@ -139,6 +149,21 @@ class DeviceService extends ChangeNotifier {
           break;
         case 'terminal_output':
           onTerminalOutputReceived?.call(data['data'] as Map<String, dynamic>);
+          break;
+        case 'file_list':
+          onFileListReceived?.call(data['data'] as Map<String, dynamic>);
+          break;
+        case 'file_upload':
+          onFileUploadReceived?.call(data['data'] as Map<String, dynamic>);
+          break;
+        case 'file_download':
+          onFileDownloadReceived?.call(data['data'] as Map<String, dynamic>);
+          break;
+        case 'file_delete':
+          onFileDeleteReceived?.call(data['data'] as Map<String, dynamic>);
+          break;
+        case 'terminal_command':
+          onTerminalCommandReceived?.call(data['data'] as Map<String, dynamic>);
           break;
         default:
           print('未知消息类型: $type');

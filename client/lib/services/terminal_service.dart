@@ -26,7 +26,6 @@ class TerminalService {
   void handleTerminalOutput(Map<String, dynamic> data) {
     final stdout = data['stdout'] as String?;
     final stderr = data['stderr'] as String?;
-    final exitCode = data['exit_code'] as int?;
 
     if (stdout != null && stdout.isNotEmpty) {
       onOutputReceived?.call(stdout);

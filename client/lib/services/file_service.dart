@@ -91,5 +91,15 @@ class FileInfo {
       modified: json['modified'] as int,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'path': path,
+      'type': type,
+      'size': size,
+      'modified': modified,
+    };
+  }
 }
 
